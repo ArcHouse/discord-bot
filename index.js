@@ -100,6 +100,33 @@ const LOL_RSS_FEEDS = [
     }
 ];
 
+// LOL YouTube каналы (RSS)
+const LOL_YOUTUBE_CHANNELS = [
+    { name: 'LoL Official', id: 'UCoLrcjPV5PbUrUyXq5mjcA' },
+    { name: 'Riot Games', id: 'UCK0e2UzxBK8RzLV2bWnMX3Q' }
+];
+
+// Функция получения LOL YouTube видео
+async function fetchLoLYouTube() {
+    const allVideos = [];
+    for (const channel of LOL_YOUTUBE_CHANNELS) {
+        try {
+            const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.id}`;
+            const data = await rssParser.parseURL(url);
+            const videos = data.items.slice(0, 3).map(item => ({
+                title: item.title,
+                link: item.link,
+                date: item.pubDate,
+                channel: channel.name
+            }));
+            allVideos.push(...videos);
+        } catch (err) {
+            console.log('⚠️ YouTube ошибка:', err.message);
+        }
+    }
+    return allVideos.slice(0, 5);
+}
+
 // Хранилище опубликованных новостей (чтобы не дублировать)
 const publishedNews = new Set();
 
@@ -1429,6 +1456,37 @@ commands.set('lolhelp', {
     }
 });
 
+// --- LOL ВИДЕО С YOUTUBE ---
+
+commands.set('lolvideos', {
+    name: 'lolvideos',
+    description: 'Свежие LOL видео с YouTube',
+    usage: '!lolvideos',
+    async execute(message) {
+        const videos = await fetchLoLYouTube();
+        if (videos.length === 0) {
+            return message.reply('❌ Не удалось загрузить видео');
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('📺 СВЕЖИЕ LOL ВИДЕО')
+            .setDescription('Последние гайды и обзоры')
+            .setFooter({ text: 'YouTube' })
+            .setTimestamp();
+
+        for (const video of videos) {
+            embed.addFields({
+                name: video.title,
+                value: `[Смотреть](${video.link})`,
+                inline: false
+            });
+        }
+
+        message.channel.send({ embeds: [embed] });
+    }
+});
+
 // --- ВЕРИФИКАЦИЯ ---
 
 commands.set('verify', {
@@ -1589,6 +1647,7 @@ commands.set('modcommands', {
                 { name: '`!modcommands #канал`', value: 'Этот список', inline: true },
                 { name: '`!gamenews`', value: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ"', inline: true },
                 { name: '`!news`', value: 'Обновить новости вручную', inline: true },
+                { name: '`!dellolcommands`', value: 'Удалить канал lol-команды', inline: true },
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ АВТОМАТИЧЕСКИ**', inline: false },
                 { name: 'Логирование', value: 'Удаление/редактирование в #📋-логи', inline: true },
                 { name: 'Прощание', value: 'Сообщение когда кто-то вышел', inline: true }
@@ -1667,6 +1726,25 @@ commands.set('deltickets', {
     }
 });
 
+// --- УДАЛИТЬ LOL КОМАНДЫ ---
+
+commands.set('dellolcommands', {
+    name: 'dellolcommands',
+    description: 'Удалить канал lol-команды',
+    usage: '!dellolcommands',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ!');
+        }
+
+        const channel = message.guild.channels.cache.find(ch => ch.name.includes('lol-komandy') || ch.name.includes('lol-команды'));
+        if (!channel) return message.reply('❌ Канал не найден!');
+
+        await channel.delete().catch(() => {});
+        message.reply('✅ Канал удалён!');
+    }
+});
+
 // --- ПОМОЩЬ ---
 
 commands.set('help', {
@@ -1686,7 +1764,7 @@ commands.set('help', {
                 { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
                 { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!modcommands` `!help`' },
                 { name: '🎮 Новости', value: '`!gamenews` `!news`' },
-                { name: '⚔️ League of Legends', value: '`!tierlist` `!top` `!builds` `!rating` `!counter` `!lolnews` `!lolhelp`' },
+                { name: '⚔️ League of Legends', value: '`!tierlist` `!top` `!builds` `!rating` `!counter` `!lolnews` `!lolvideos` `!lolhelp`' },
                 { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
