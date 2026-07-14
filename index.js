@@ -1060,10 +1060,10 @@ commands.set('gamenews', {
             const category = await guild.channels.create({ name: '🎮 ИГРОВЫЕ НОВОСТИ', type: 4 });
 
             // 2. Каналы
-            const ch1 = await guild.channels.create({ name: '📰-igrovye-novosti', type: 0, parent: category });
-            const ch2 = await guild.channels.create({ name: '🎮-lol-novosti', type: 0, parent: category });
-            const ch3 = await guild.channels.create({ name: '⚔️-lol-gajdy', type: 0, parent: category });
-            const ch4 = await guild.channels.create({ name: '💬-lol-komandy', type: 0, parent: category });
+            const ch1 = await guild.channels.create({ name: '📰-игровые-новости', type: 0, parent: category });
+            const ch2 = await guild.channels.create({ name: '🎮-lol-новости', type: 0, parent: category });
+            const ch3 = await guild.channels.create({ name: '⚔️-lol-гайды', type: 0, parent: category });
+            const ch4 = await guild.channels.create({ name: '💬-lol-команды', type: 0, parent: category });
 
             const everyone = guild.roles.everyone;
 
@@ -1117,7 +1117,7 @@ commands.set('gamenews', {
                     .setTitle('⚔️ LOL ГАЙДЫ И СТАТИСТИКА')
                     .setDescription('Всё для LOL: Tier List, сборки, рейтинги!')
                     .addFields(
-                        { name: 'Где писать команды?', value: 'В канале **💬-lol-komandy**!' }
+                        { name: 'Где писать команды?', value: 'В канале **💬-lol-команды**!' }
                     )
                     .setFooter({ text: 'Данные: OP.GG | Авто-обновление' })
                     .setTimestamp()
@@ -1144,7 +1144,7 @@ commands.set('gamenews', {
                     .setDescription('Структура готова:')
                     .addFields(
                         { name: 'Категория', value: '🎮 ИГРОВЫЕ НОВОСТИ' },
-                        { name: 'Каналы', value: '📰-igrovye-novosti\n🎮-lol-novosti\n⚔️-lol-gajdy\n💬-lol-komandy' },
+                        { name: 'Каналы', value: '📰-игровые-новости\n🎮-lol-новости\n⚔️-lol-гайды\n💬-lol-команды' },
                         { name: 'Права', value: 'Новости: только вы пишете\nКоманды: все пишут' }
                     )
                     .setTimestamp()
@@ -1177,7 +1177,7 @@ commands.set('postwelcome', {
 
         try {
             // Канал общих новостей
-            const gameNewsChannel = guild.channels.cache.find(ch => ch.name.includes('igrovye-novosti') || ch.name.includes('igro'));
+            const gameNewsChannel = guild.channels.cache.find(ch => ch.name.includes('igrovye-novosti') || ch.name.includes('igro') || ch.name.includes('игровые-новости'));
             if (gameNewsChannel) {
                 const welcomeEmbed = new EmbedBuilder()
                     .setColor(0x5865f2)
@@ -1194,7 +1194,7 @@ commands.set('postwelcome', {
             }
 
             // Канал LOL новостей
-            const lolNewsChannel = guild.channels.cache.find(ch => ch.name.includes('lol-novosti'));
+            const lolNewsChannel = guild.channels.cache.find(ch => ch.name.includes('lol-novosti') || ch.name.includes('lol-новости'));
             if (lolNewsChannel) {
                 const lolNewsEmbed = new EmbedBuilder()
                     .setColor(0xffd700)
@@ -1210,7 +1210,7 @@ commands.set('postwelcome', {
             }
 
             // Канал LOL гайдов
-            const lolGuidesChannel = guild.channels.cache.find(ch => ch.name.includes('lol-gajdy'));
+            const lolGuidesChannel = guild.channels.cache.find(ch => ch.name.includes('lol-гайды'));
             if (lolGuidesChannel) {
                 const lolGuidesEmbed = new EmbedBuilder()
                     .setColor(0xffd700)
@@ -1236,7 +1236,7 @@ commands.set('postwelcome', {
             }
 
             // Канал LOL команд
-            const lolCommandsChannel = guild.channels.cache.find(ch => ch.name.includes('lol-komandy'));
+            const lolCommandsChannel = guild.channels.cache.find(ch => ch.name.includes('lol-команды'));
             if (lolCommandsChannel) {
                 const lolCommandsEmbed = new EmbedBuilder()
                     .setColor(0x00ff00)
