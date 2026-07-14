@@ -1082,15 +1082,44 @@ commands.set('gamenews', {
             });
 
             // Создаём канал для LOL гайдов
-            const lolChannel = await guild.channels.create({
+            const lolGuidesChannel = await guild.channels.create({
                 name: '⚔️-lol-гайды',
                 type: 0,
                 parent: catGameNews,
             });
 
-            // Настройка прав для всех каналов (только бот пишет)
+            // Создаём канал для LOL команд
+            const lolCommandsChannel = await guild.channels.create({
+                name: '💬-lol-команды',
+                type: 0,
+                parent: catGameNews,
+            });
+
+            // Настройка прав для каналов автопостинга (только бот и владелец пишут)
             const everyone = guild.roles.everyone;
-            const channels = [gameNewsChannel, lolNewsChannel, lolChannel];
+            const autoPostChannels = [gameNewsChannel, lolNewsChannel, lolGuidesChannel];
+
+            // Каналы автопостинга - никто не пишет кроме.owner и Admin
+            for (const channel of autoPostChannels) {
+                await channel.permissionOverwrites.edit(everyone, {
+                    ViewChannel: true,
+                    SendMessages: false,
+                    SendMessagesInThreads: false,
+                    AddReactions: false,
+                    EmbedLinks: false,
+                    AttachFiles: false,
+                });
+            }
+
+            // Канал команд - все могут писать
+            await lolCommandsChannel.permissionOverwrites.edit(everyone, {
+                ViewChannel: true,
+                SendMessages: true,
+                SendMessagesInThreads: true,
+                AddReactions: true,
+                EmbedLinks: true,
+                AttachFiles: false,
+            });
 
             for (const channel of channels) {
                 await channel.permissionOverwrites.edit(everyone, {
@@ -1103,10 +1132,10 @@ commands.set('gamenews', {
                 });
             }
 
-            // Добавляем права для владельца сервера
+            // Добавляем права для владельца сервера (везде может писать)
             const owner = guild.members.cache.get(guild.ownerId);
             if (owner) {
-                for (const channel of channels) {
+                for (const channel of [...autoPostChannels, lolCommandsChannel]) {
                     await channel.permissionOverwrites.edit(owner, {
                         ViewChannel: true, SendMessages: true, SendMessagesInThreads: true,
                         AddReactions: true, EmbedLinks: true, AttachFiles: true,
@@ -1114,10 +1143,10 @@ commands.set('gamenews', {
                 }
             }
 
-            // Добавляем права для Admin роли
+            // Добавляем права для Admin роли (везде может писать)
             const adminRole = guild.roles.cache.find(r => r.name === 'Admin');
             if (adminRole) {
-                for (const channel of channels) {
+                for (const channel of [...autoPostChannels, lolCommandsChannel]) {
                     await channel.permissionOverwrites.edit(adminRole, {
                         ViewChannel: true, SendMessages: true, SendMessagesInThreads: true,
                         AddReactions: true, EmbedLinks: true, AttachFiles: true,
@@ -1131,8 +1160,8 @@ commands.set('gamenews', {
                 .setDescription('Структура новостей готова:')
                 .addFields(
                     { name: '📁 Категория', value: '🎮 ИГРОВЫЕ НОВОСТИ', inline: true },
-                    { name: '📺 Каналы', value: '📰-игровые-новости, 🎮-lol-новости, ⚔️-lol-гайды', inline: true },
-                    { name: '🔒 Права', value: 'Только вы и Admin могут писать', inline: true }
+                    { name: '📺 Каналы', value: '📰-игровые-новости, 🎮-lol-новости, ⚔️-lol-гайды, 💬-lol-команды', inline: true },
+                    { name: '🔒 Права', value: 'Новости: только вы пишете\nКоманды: все могут писать', inline: true }
                 )
                 .setTimestamp();
             msg.edit({ embeds: [successEmbed] });
@@ -1173,12 +1202,26 @@ commands.set('gamenews', {
                     { name: '📊 Tier List', value: 'Текущий рейтинг чемпионов по тирам', inline: true },
                     { name: '🛡 Топ Сборки', value: 'Лучшие сборки по позициям', inline: true },
                     { name: '🏆 Рейтинг', value: 'Топ-5 чемпионов по Win Rate', inline: true },
-                    { name: '📜 Команды', value: '`!tierlist` - Tier List\n`!builds mid` - Сборки (mid/adc/support/jungle/top)\n`!rating` - Рейтинг\n`!counter Locke` - Контры чемпиона\n`!lolnews` - Новости LOL', inline: false }
+                    { name: '📜 Команды', value: '`!tierlist` - Tier List\n`!builds mid` - Сборки (mid/adc/support/jungle/top)\n`!rating` - Рейтинг\n`!counter Locke` - Контры чемпиона\n`!lolnews` - Новости LOL', inline: false },
+                    { name: '💬 Где писать команды?', value: 'В канале **💬-lol-команды**!', inline: false }
                 )
                 .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
                 .setFooter({ text: 'Данные: OP.GG | Обновляется автоматически' })
                 .setTimestamp();
-            await lolChannel.send({ embeds: [lolWelcomeEmbed] });
+            await lolGuidesChannel.send({ embeds: [lolWelcomeEmbed] });
+
+            // Отправляем приветственное сообщение в канал команд
+            const lolCommandsEmbed = new EmbedBuilder()
+                .setColor(0x00ff00)
+                .setTitle('💬 LOL КОМАНДЫ')
+                .setDescription('Пишите команды здесь! Бот ответит в этом чате.')
+                .addFields(
+                    { name: '📜 Доступные команды', value: '`!tierlist` - Tier List\n`!builds mid` - Сборки\n`!rating` - Рейтинг\n`!counter Locke` - Контры\n`!lolnews` - Новости\n`!lolhelp` - Подробная помощь', inline: false },
+                    { name: '💡 Примеры', value: '`!tierlist` - покажет Tier List\n`!builds mid` - сборки на мид\n`!counter Jinx` - контры Джинкс', inline: false }
+                )
+                .setFooter({ text: 'Не спамите! Используйте команды с умом.' })
+                .setTimestamp();
+            await lolCommandsChannel.send({ embeds: [lolCommandsEmbed] });
         } catch (err) {
             console.error('❌ Ошибка gamenews:', err);
             msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
