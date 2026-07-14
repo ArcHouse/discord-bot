@@ -195,9 +195,48 @@ function createTierListEmbed() {
             { name: '🥈 A Tier (Хорошие)', value: LOL_TIER_LIST.A.map(c => `• ${c}`).join('\n'), inline: true },
             { name: '🥉 B Tier (Нормальные)', value: LOL_TIER_LIST.B.map(c => `• ${c}`).join('\n'), inline: true }
         )
+        .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
         .setFooter({ text: 'Данные: OP.GG | Обновляется каждую неделю' })
         .setTimestamp();
     return embed;
+}
+
+// Функция получения картинки чемпиона
+function getChampionImage(championName) {
+    const champions = {
+        'Locke': 'Locke',
+        'Seraphine': 'Seraphine',
+        'Senna': 'Senna',
+        'Jinx': 'Jinx',
+        'Thresh': 'Thresh',
+        'Leona': 'Leona',
+        'Ahri': 'Ahri',
+        'Syndra': 'Syndra',
+        'Viktor': 'Viktor',
+        'Sylas': 'Sylas',
+        'Katarina': 'Katarina',
+        'Malphite': 'Malphite',
+        'Garen': 'Garen',
+        'Shen': 'Shen',
+        'Ornn': 'Ornn',
+        'Dr. Mundo': 'DrMundo',
+        'Warwick': 'Warwick',
+        'Braum': 'Braum',
+        'Vex': 'Vex',
+        'Nautilus': 'Nautilus',
+        'Rell': 'Rell',
+        'Nasus': 'Nasus',
+        'Nocturne': 'Nocturne',
+        'Wukong': 'MonkeyKing',
+        'Briar': 'Briar',
+        'Xerath': 'Xerath',
+        'Fizz': 'Fizz',
+        'Diana': 'Diana',
+        'Katarina': 'Katarina'
+    };
+
+    const champId = champions[championName] || championName;
+    return `https://opgg-static.akamaized.net/meta/images/lol/20240418151623.${champId}.png`;
 }
 
 // Создание сборок embed
@@ -213,6 +252,14 @@ function createBuildsEmbed(position) {
         top: 'Топ'
     };
 
+    const positionEmojis = {
+        mid: '⚔️',
+        adc: '🏹',
+        support: '🛡',
+        jungle: '🗡',
+        top: '🛡'
+    };
+
     const description = Object.entries(builds).map(([champ, data]) => {
         return `**${champ}**\n` +
                `🛡 Предметы: ${data.items.join(', ')}\n` +
@@ -221,8 +268,9 @@ function createBuildsEmbed(position) {
 
     const embed = new EmbedBuilder()
         .setColor(0x00ff00)
-        .setTitle(`🛡 ТОП СБОРКИ - ${positionNames[position]}`)
+        .setTitle(`${positionEmojis[position]} ТОП СБОРКИ - ${positionNames[position]}`)
         .setDescription(description)
+        .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
         .setFooter({ text: 'Данные: OP.GG/U.GG | Патч 16.13' })
         .setTimestamp();
     return embed;
@@ -241,6 +289,7 @@ function createRatingEmbed() {
             { name: '🗡 Джунгль', value: '1. Nasus (53.12%)\n2. Nocturne (51.57%)\n3. Wukong (51.98%)\n4. Briar (51.67%)\n5. Sylas (50.46%)', inline: true },
             { name: '🛡 Топ', value: '1. Garen (51.76%)\n2. Malphite (51.34%)\n3. Kayle (52.02%)\n4. Shen (51.65%)\n5. Ornn (51.33%)', inline: true }
         )
+        .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
         .setFooter({ text: 'Данные: OP.GG | Emerald+' })
         .setTimestamp();
     return embed;
@@ -1190,6 +1239,7 @@ commands.set('counter', {
                     inline: true
                 }))
             )
+            .setThumbnail(getChampionImage(champ))
             .setFooter({ text: 'Данные: OP.GG | Emerald+' })
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
