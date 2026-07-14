@@ -236,6 +236,17 @@ function createTopChampionsEmbed(position) {
 
     if (!champions) return null;
 
+    // Эмодзи для предметов
+    const itemEmojis = {
+        'Луден': '🟣', 'Светлячок': '🔵', 'Бездонная маска': '🟠',
+        'Чертоги': '🟢', 'Сфера Void': '🔴', 'Пламя Рыцаря': '🟤',
+        'Клятва Крушителя': '🟡', 'Танцующий меч': '⚪', 'Бесконечный голод': '🔵',
+        'Доминик': '🔴', 'Смертельный танец': '⚫', 'Зимняя гора': '🟣',
+        'Запредельная сила': '🟢', 'Воздаятель': '🔵', 'Медальон': '🟤',
+        'Черный топор': '⚫', 'Костяной щит': '🟡', 'Джунгл предмет': '🟣',
+        'Клятва': '🟡', 'Клинок': '⚪', 'Ледяной шлем': '🔵', 'Платье Рыцаря': '🟠'
+    };
+
     const embeds = [];
 
     // Главный embed
@@ -252,15 +263,21 @@ function createTopChampionsEmbed(position) {
         const champ = champions[i];
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
 
+        // Формируем строку предметов с эмодзи
+        const itemsWithEmojis = champ.items.map(item => {
+            const emoji = itemEmojis[item] || '⬛';
+            return `${emoji} **${item}**`;
+        }).join(' → ');
+
         const champEmbed = new EmbedBuilder()
             .setColor(getTierColor(champ.tier))
             .setTitle(`${medal} ${champ.name} — ${champ.tier} Tier`)
             .setDescription(`**Win Rate:** ${champ.winRate} | **Pick Rate:** ${champ.pickRate} | **Ban Rate:** ${champ.banRate}`)
             .addFields(
                 { name: '🔮 Руна', value: champ.rune, inline: true },
-                { name: '🛡 Сборка', value: champ.items.join(' → '), inline: false }
+                { name: '🛡 Сборка', value: itemsWithEmojis, inline: false }
             )
-            .setThumbnail(getChampionImage(champ.name)); // Маленькая картинка справа
+            .setThumbnail(getChampionImage(champ.name));
         embeds.push(champEmbed);
     }
 
@@ -274,6 +291,32 @@ function createBuildsEmbed(position) {
 
     const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
     const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
+
+    // Эмодзи для предметов (цветные квадратики)
+    const itemEmojis = {
+        'Луден': '🟣',
+        'Светлячок': '🔵',
+        'Бездонная маска': '🟠',
+        'Чертоги': '🟢',
+        'Сфера Void': '🔴',
+        'Пламя Рыцаря': '🟤',
+        'Клятва Крушителя': '🟡',
+        'Танцующий меч': '⚪',
+        'Бесконечный голод': '🔵',
+        'Доминик': '🔴',
+        'Смертельный танец': '⚫',
+        'Зимняя гора': '🟣',
+        'Запредельная сила': '🟢',
+        'Воздаятель': '🔵',
+        'Медальон': '🟤',
+        'Черный топор': '⚫',
+        'Костяной щит': '🟡',
+        'Джунгл предмет': '🟣',
+        'Клятва': '🟡',
+        'Клинок': '⚪',
+        'Ледяной шлем': '🔵',
+        'Платье Рыцаря': '🟠'
+    };
 
     const embeds = [];
 
@@ -290,37 +333,22 @@ function createBuildsEmbed(position) {
     for (let i = 0; i < Math.min(champions.length, 3); i++) {
         const champ = champions[i];
 
-        // Создаём embed для сборки
+        // Формируем строку предметов с эмодзи
+        const itemsWithEmojis = champ.items.map(item => {
+            const emoji = itemEmojis[item] || '⬛';
+            return `${emoji} **${item}**`;
+        }).join(' → ');
+
         const buildEmbed = new EmbedBuilder()
             .setColor(getTierColor(champ.tier))
             .setTitle(`${getTierEmoji(champ.tier)} ${champ.name} — ${champ.tier} Tier`)
             .setDescription(`**Win Rate:** ${champ.winRate}`)
+            .addFields(
+                { name: '🔮 Руна', value: champ.rune, inline: true },
+                { name: '🛡 Сборка', value: itemsWithEmojis, inline: false }
+            )
             .setThumbnail(getChampionImage(champ.name));
-
-        // Добавляем руны
-        buildEmbed.addFields({ name: '🔮 Руна', value: champ.rune, inline: true });
-
-        // Добавляем каждый предмет с картинкой
-        for (let j = 0; j < champ.items.length; j++) {
-            const item = champ.items[j];
-            const itemEmoji = j === 0 ? '1️⃣' : j === 1 ? '2️⃣' : '3️⃣';
-            buildEmbed.addFields({
-                name: `${itemEmoji} ${item}`,
-                value: `[Картинка предмета](${getItemImage(item)})`,
-                inline: true
-            });
-        }
-
         embeds.push(buildEmbed);
-
-        // Добавляем отдельный embed с картинкой предмета (первый предмет)
-        if (champ.items.length > 0) {
-            const itemEmbed = new EmbedBuilder()
-                .setColor(0x5865f2)
-                .setTitle(`🛡 Предметы ${champ.name}`)
-                .setImage(getItemImage(champ.items[0]));
-            embeds.push(itemEmbed);
-        }
     }
 
     return embeds;
