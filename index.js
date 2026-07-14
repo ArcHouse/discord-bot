@@ -363,16 +363,21 @@ commands.set('play', {
                 metadata: { channel: message.channel },
                 leaveOnEmpty: true,
                 leaveOnEnd: true,
+                selfDeaf: true,
+                volume: 50,
             });
 
             try {
-                if (!queue.connection) await queue.connect(voiceChannel);
+                if (!queue.connection) {
+                    await queue.connect(voiceChannel.id);
+                }
             } catch (err) {
+                console.error('❌ Ошибка подключения:', err.message);
                 player.nodes.delete(message.guild);
                 return message.reply('❌ Не могу подключиться к голосовому каналу!');
             }
 
-            await queue.addTrack(searchResult.tracks[0]);
+            queue.addTrack(searchResult.tracks[0]);
 
             if (!queue.isPlaying()) {
                 await queue.play();
