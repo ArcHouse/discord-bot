@@ -228,7 +228,7 @@ function createTierListEmbed() {
     return embed;
 }
 
-// Создание embed для ТОП по позициям (СТИЛЬ OP.GG)
+// Создание embed для ТОП по позициям
 function createTopChampionsEmbed(position) {
     const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
     const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
@@ -236,39 +236,53 @@ function createTopChampionsEmbed(position) {
 
     if (!champions) return null;
 
+    const itemEmojis = {
+        'Луден': '🟣', 'Светлячок': '🔵', 'Бездонная маска': '🟠',
+        'Чертоги': '🟢', 'Сфера Void': '🔴', 'Пламя Рыцаря': '🟤',
+        'Клятва Крушителя': '🟡', 'Танцующий меч': '⚪', 'Бесконечный голод': '🔵',
+        'Доминик': '🔴', 'Смертельный танец': '⚫', 'Зимняя гора': '🟣',
+        'Запредельная сила': '🟢', 'Воздаятель': '🔵', 'Медальон': '🟤',
+        'Черный топор': '⚫', 'Костяной щит': '🟡', 'Джунгл предмет': '🟣',
+        'Клятва': '🟡', 'Клинок': '⚪', 'Ледяной шлем': '🔵', 'Платье Рыцаря': '🟠'
+    };
+
     const embeds = [];
 
     // Главный embed
     const mainEmbed = new EmbedBuilder()
         .setColor(0x1a1a2e)
         .setTitle(`${positionEmojis[position]} ТОП ЧЕМПИОНОВ — ${positionNames[position]}`)
-        .setDescription('**Лучшие чемпионы по Win Rate** (Emerald+)\n\nДанные: OP.GG | Патч 16.13')
-        .setFooter({ text: 'Обновляется каждую неделю' })
+        .setDescription('**Лучшие чемпионы по Win Rate** (Emerald+)')
+        .setFooter({ text: 'Данные: OP.GG | Патч 16.13' })
         .setTimestamp();
     embeds.push(mainEmbed);
 
-    // Каждый чемпион — стиль OP.GG
+    // Каждый чемпион
     for (let i = 0; i < Math.min(champions.length, 5); i++) {
         const champ = champions[i];
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
 
+        const itemsText = champ.items.map(item => {
+            const emoji = itemEmojis[item] || '⬛';
+            return `${emoji} ${item}`;
+        }).join(' → ');
+
         const champEmbed = new EmbedBuilder()
             .setColor(0x1a1a2e)
             .setTitle(`${medal} ${champ.name} — ${champ.tier} Tier`)
-            .setDescription(
-                `**Позиция:** ${positionNames[position]}\n` +
-                `**Винрейт:** ${champ.winRate} | **Пикрейт:** ${champ.pickRate} | **Банрейт:** ${champ.banRate}\n\n` +
-                `**🔮 Руны:**\n${champ.rune}\n\n` +
-                `**🛡 Сборка:**\n${champ.items.join(' → ')}`
+            .setDescription(`**Win Rate:** ${champ.winRate} | **Pick Rate:** ${champ.pickRate} | **Ban Rate:** ${champ.banRate}`)
+            .addFields(
+                { name: '🔮 Руна', value: champ.rune, inline: true },
+                { name: '🛡 Сборка', value: itemsText, inline: false }
             )
-            .setImage(getChampionImage(champ.name));
+            .setThumbnail(getChampionImage(champ.name));
         embeds.push(champEmbed);
     }
 
     return embeds;
 }
 
-// Создание сборок embed (СТИЛЬ OP.GG)
+// Создание сборок embed
 function createBuildsEmbed(position) {
     const champions = LOL_CHAMPIONS[position];
     if (!champions) return null;
@@ -276,9 +290,18 @@ function createBuildsEmbed(position) {
     const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
     const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
 
+    const itemEmojis = {
+        'Луден': '🟣', 'Светлячок': '🔵', 'Бездонная маска': '🟠',
+        'Чертоги': '🟢', 'Сфера Void': '🔴', 'Пламя Рыцаря': '🟤',
+        'Клятва Крушителя': '🟡', 'Танцующий меч': '⚪', 'Бесконечный голод': '🔵',
+        'Доминик': '🔴', 'Смертельный танец': '⚫', 'Зимняя гора': '🟣',
+        'Запредельная сила': '🟢', 'Воздаятель': '🔵', 'Медальон': '🟤',
+        'Черный топор': '⚫', 'Костяной щит': '🟡', 'Джунгл предмет': '🟣',
+        'Клятва': '🟡', 'Клинок': '⚪', 'Ледяной шлем': '🔵', 'Платье Рыцаря': '🟠'
+    };
+
     const embeds = [];
 
-    // Главный embed
     const mainEmbed = new EmbedBuilder()
         .setColor(0x1a1a2e)
         .setTitle(`${positionEmojis[position]} ТОП СБОРКИ — ${positionNames[position]}`)
@@ -287,19 +310,23 @@ function createBuildsEmbed(position) {
         .setTimestamp();
     embeds.push(mainEmbed);
 
-    // Каждая сборка — стиль OP.GG
     for (let i = 0; i < Math.min(champions.length, 3); i++) {
         const champ = champions[i];
+
+        const itemsText = champ.items.map(item => {
+            const emoji = itemEmojis[item] || '⬛';
+            return `${emoji} ${item}`;
+        }).join(' → ');
 
         const buildEmbed = new EmbedBuilder()
             .setColor(0x1a1a2e)
             .setTitle(`${getTierEmoji(champ.tier)} ${champ.name} — ${champ.tier} Tier`)
-            .setDescription(
-                `**Винрейт:** ${champ.winRate}\n\n` +
-                `**🔮 Руны:**\n${champ.rune}\n\n` +
-                `**🛡 Сборка:**\n${champ.items.join(' → ')}`
+            .setDescription(`**Win Rate:** ${champ.winRate}`)
+            .addFields(
+                { name: '🔮 Руна', value: champ.rune, inline: true },
+                { name: '🛡 Сборка', value: itemsText, inline: false }
             )
-            .setImage(getChampionImage(champ.name));
+            .setThumbnail(getChampionImage(champ.name));
         embeds.push(buildEmbed);
     }
 
