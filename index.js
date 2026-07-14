@@ -210,7 +210,7 @@ function createTopChampionsEmbed(position) {
         .setColor(0xffd700)
         .setTitle(`${positionEmojis[position]} ТОП ЧЕМПИОНОВ — ${positionNames[position]}`)
         .setDescription('**Лучшие чемпионы по Win Rate** (Emerald+)')
-        .setThumbnail(getChampionImage(champions[0].name))
+        .setImage(getChampionImage(champions[0].name))
         .setFooter({ text: 'Данные: OP.GG | Патч 16.13' })
         .setTimestamp();
 
@@ -240,7 +240,7 @@ function createBuildsEmbed(position) {
         .setColor(0x00ff00)
         .setTitle(`${positionEmojis[position]} ТОП СБОРКИ — ${positionNames[position]}`)
         .setDescription('**Лучшие сборки по Win Rate** (Emerald+)')
-        .setThumbnail(getChampionImage(champions[0].name))
+        .setImage(getChampionImage(champions[0].name))
         .setFooter({ text: 'Данные: OP.GG/U.GG | Патч 16.13' })
         .setTimestamp();
 
