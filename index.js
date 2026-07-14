@@ -390,7 +390,9 @@ commands.set('play', {
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         } catch (err) {
-            message.reply('❌ Ошибка при воспроизведении!');
+            console.error('❌ Ошибка музыки:', err.message);
+            console.error(err.stack);
+            message.reply(`❌ Ошибка при воспроизведении: ${err.message.substring(0, 200)}`);
         }
     }
 });
