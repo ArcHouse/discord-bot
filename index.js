@@ -353,23 +353,12 @@ commands.set('play', {
         if (!query) return message.reply('❌ Укажи название или ссылку: !play Never Gonna Give You Up');
 
         try {
-            const queue = player.nodes.create(message.guild, {
-                metadata: { channel: message.channel },
-                leaveOnEmpty: true,
-                leaveOnEnd: true,
-                selfDeaf: true,
-                volume: 50,
-            });
-
-            if (!queue.connection) {
-                await queue.connect(voiceChannel);
-            }
-
             const track = await player.play(voiceChannel, query, {
                 nodeOptions: {
                     metadata: { channel: message.channel },
-                    leaveOnEmpty: true,
-                    leaveOnEnd: true,
+                    leaveOnEmpty: false,
+                    leaveOnEnd: false,
+                    leaveOnEmptyTimeout: 300000,
                     selfDeaf: true,
                     volume: 50,
                 },
