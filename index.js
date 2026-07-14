@@ -788,10 +788,6 @@ commands.set('modcommands', {
     }
 });
 
-        message.reply(`✅ Список команд отправлен в ${channel}`);
-    }
-});
-
 // --- ПОМОЩЬ ---
 
 commands.set('help', {
