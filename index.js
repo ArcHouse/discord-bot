@@ -788,6 +788,72 @@ commands.set('modcommands', {
     }
 });
 
+// --- СПРЯТАТЬ МОД КАНАЛЫ ---
+
+commands.set('lockmod', {
+    name: 'lockmod',
+    description: 'Спрятать модераторские каналы от обычных участников',
+    usage: '!lockmod',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может!');
+        }
+
+        const everyone = message.guild.roles.everyone;
+        const modChannels = ['📋-логи', '⚡-модерация-чат'];
+
+        for (const name of modChannels) {
+            const channel = message.guild.channels.cache.find(ch => ch.name === name);
+            if (!channel) continue;
+
+            await channel.permissionOverwrites.edit(everyone, {
+                ViewChannel: false,
+            }).catch(() => {});
+
+            // Добавляем права для Admin и Moderator если их роли есть
+            const adminRole = message.guild.roles.cache.find(r => r.name === 'Admin');
+            const modRole = message.guild.roles.cache.find(r => r.name === 'Moderator');
+
+            if (adminRole) {
+                await channel.permissionOverwrites.edit(adminRole, {
+                    ViewChannel: true,
+                }).catch(() => {});
+            }
+            if (modRole) {
+                await channel.permissionOverwrites.edit(modRole, {
+                    ViewChannel: true,
+                }).catch(() => {});
+            }
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('🔒 Модераторские каналы скрыты')
+            .setDescription('Каналы **#📋-логи** и **#⚡-модерация-чат** теперь видны только модераторам и админам.')
+            .setTimestamp();
+        message.channel.send({ embeds: [embed] });
+    }
+});
+
+// --- УДАЛИТЬ ТИКЕТЫ ---
+
+commands.set('deltickets', {
+    name: 'deltickets',
+    description: 'Удалить канал тикетов',
+    usage: '!deltickets',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может!');
+        }
+
+        const channel = message.guild.channels.cache.find(ch => ch.name === '🎫-тикеты');
+        if (!channel) return message.reply('❌ Канал тикетов не найден!');
+
+        await channel.delete().catch(() => {});
+        message.reply('✅ Канал тикетов удалён!');
+    }
+});
+
 // --- ПОМОЩЬ ---
 
 commands.set('help', {
