@@ -436,7 +436,7 @@ async function postNewsToChannel(client) {
         // Ищем канал для общих игровых новостей (не LOL)
         for (const [, guild] of client.guilds.cache) {
             const newsChannel = guild.channels.cache.find(ch => 
-                (ch.name.includes('игровые-новости') || ch.name.includes('novosti')) && 
+                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')) && 
                 !ch.name.includes('lol')
             );
             if (!newsChannel) {
@@ -1936,9 +1936,10 @@ client.on('ready', () => {
     const youtubeHours = [11, 17, 23];
     console.log(`📺 LOL YouTube: ${youtubeHours.join(':00, ')}:00`);
 
-    // Проверяем каждые 30 минут
+            // Проверяем каждые 30 минут
     setInterval(async () => {
         const currentHour = new Date().getHours();
+        console.log(`⏰ Проверяю время: ${currentHour}:00`);
 
         // 📰 Игровые новости
         if (newsHours.includes(currentHour)) {
@@ -1950,8 +1951,11 @@ client.on('ready', () => {
         if (tierListHours.includes(currentHour)) {
             console.log('⚔️ Обновляю LOL Tier List...');
             for (const [, guild] of client.guilds.cache) {
-                const lolGuidesChannel = guild.channels.cache.find(ch => ch.name.includes('lol-гайды'));
+                const lolGuidesChannel = guild.channels.cache.find(ch => 
+                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
+                );
                 if (lolGuidesChannel) {
+                    console.log('⚔️ Канал найден:', lolGuidesChannel.name);
                     await lolGuidesChannel.send({ embeds: [createTierListEmbed()] }).catch(() => {});
                 }
             }
@@ -1961,8 +1965,11 @@ client.on('ready', () => {
         if (buildsHours.includes(currentHour)) {
             console.log('🛡 Обновляю LOL Сборки...');
             for (const [, guild] of client.guilds.cache) {
-                const lolGuidesChannel = guild.channels.cache.find(ch => ch.name.includes('lol-гайды'));
+                const lolGuidesChannel = guild.channels.cache.find(ch => 
+                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
+                );
                 if (lolGuidesChannel) {
+                    console.log('🛡 Канал найден:', lolGuidesChannel.name);
                     await lolGuidesChannel.send({ embeds: [createBuildsEmbed('mid')] }).catch(() => {});
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     await lolGuidesChannel.send({ embeds: [createBuildsEmbed('adc')] }).catch(() => {});
@@ -1974,8 +1981,11 @@ client.on('ready', () => {
         if (ratingHours.includes(currentHour)) {
             console.log('🏆 Обновляю LOL Рейтинг...');
             for (const [, guild] of client.guilds.cache) {
-                const lolGuidesChannel = guild.channels.cache.find(ch => ch.name.includes('lol-гайды'));
+                const lolGuidesChannel = guild.channels.cache.find(ch => 
+                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
+                );
                 if (lolGuidesChannel) {
+                    console.log('🏆 Канал найден:', lolGuidesChannel.name);
                     await lolGuidesChannel.send({ embeds: [createRatingEmbed()] }).catch(() => {});
                 }
             }
@@ -1985,9 +1995,13 @@ client.on('ready', () => {
         if (youtubeHours.includes(currentHour)) {
             console.log('📺 Обновляю LOL YouTube видео...');
             for (const [, guild] of client.guilds.cache) {
-                const lolGuidesChannel = guild.channels.cache.find(ch => ch.name.includes('lol-гайды'));
+                const lolGuidesChannel = guild.channels.cache.find(ch => 
+                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
+                );
                 if (lolGuidesChannel) {
+                    console.log('📺 Канал найден:', lolGuidesChannel.name);
                     const videos = await fetchLoLYouTube();
+                    console.log('📺 Получено видео:', videos.length);
                     if (videos.length > 0) {
                         const embed = new EmbedBuilder()
                             .setColor(0xff0000)
@@ -2004,6 +2018,8 @@ client.on('ready', () => {
                         }
                         await lolGuidesChannel.send({ embeds: [embed] }).catch(() => {});
                     }
+                } else {
+                    console.log('📺 Канал lol-гайды не найден!');
                 }
             }
         }
