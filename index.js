@@ -1305,7 +1305,11 @@ commands.set('postwelcome', {
             }
 
             // Канал LOL команд
-            const lolCommandsChannel = guild.channels.cache.find(ch => ch.name.includes('lol-команды') || ch.name.includes('lol-komandy'));
+            const lolCommandsChannel = guild.channels.cache.find(ch => 
+                ch.name.includes('lol-команды') || 
+                ch.name.includes('lol-komandy') || 
+                ch.name.includes('komandy')
+            );
             if (lolCommandsChannel) {
                 const lolCommandsEmbed = new EmbedBuilder()
                     .setColor(0x00ff00)
