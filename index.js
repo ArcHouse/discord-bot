@@ -100,11 +100,8 @@ const LOL_RSS_FEEDS = [
     }
 ];
 
-// LOL YouTube каналы (используем рабочие ID)
-const LOL_YOUTUBE_CHANNELS = [
-    { name: 'LoL Highlights', id: 'UCoLrcjPV5PbUrUyXq5mjcA' },
-    { name: 'LoL Esports', id: 'UC2tZoKQ1mOBt3w-0VKTjCig' }
-];
+// LOL YouTube каналы (пока не работает - YouTube блокирует)
+const LOL_YOUTUBE_CHANNELS = [];
 
 // Функция получения LOL YouTube видео
 async function fetchLoLYouTube() {
@@ -1495,7 +1492,7 @@ commands.set('lolvideos', {
     async execute(message) {
         const videos = await fetchLoLYouTube();
         if (videos.length === 0) {
-            return message.reply('❌ Не удалось загрузить видео');
+            return message.reply('⚠️ YouTube временно недоступен. Попробуйте позже.');
         }
 
         const embed = new EmbedBuilder()
