@@ -165,6 +165,36 @@ function getChampionImage(championName) {
     return `https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/${id}.png`;
 }
 
+// Картинки предметов (Riot Data Dragon)
+function getItemImage(itemName) {
+    const items = {
+        'Луден': '3285',        // Luden's Tempest
+        'Светлячок': '4628',    // Horizon Focus
+        'Бездонная маска': '4645', // Shadowflame
+        'Чертоги': '4637',      // Cryptbloom
+        'Сфера Void': '3135',   // Void Staff
+        'Пламя Рыцаря': '3142', // Youmuu's Ghostblade
+        'Клятва Крушителя': '3153', // Immortal Shieldbow
+        'Танцующий меч': '3124', // Guinsoo's Rageblade
+        'Бесконечный голод': '3031', // Infinity Edge
+        'Доминик': '3036',      // Lord Dominik's Regards
+        'Смертельный танец': '3156', // Death's Dance
+        'Зимняя гора': '3857',  // Steel Shoulderguards
+        'Запредельная сила': '3190', // Locket of the Iron Solari
+        'Воздаятель': '3107',   // Redemption
+        'Медальон': '3190',     // Locket
+        'Черный топор': '3071', // Black Cleaver
+        'Костяной щит': '3068', // Sunfire Aegis
+        'Джунгл предмет': '1101', // Hailblade
+        'Клятва': '3153',       // Immortal Shieldbow
+        'Клинок': '3134',       // Serrated Dirk
+        'Ледяной шлем': '3116', // Rylai's Crystal Scepter
+        'Платье Рыцаря': '3157' // Zhonya's Hourglass
+    };
+    const itemId = items[itemName] || '1001'; // Default boot if not found
+    return `https://ddragon.leagueoflegends.com/cdn/14.7.1/img/item/${itemId}.png`;
+}
+
 // ТIER EMOJI
 function getTierEmoji(tier) {
     const emojis = { 'S+': '🏆', 'S': '🥇', 'A': '🥈', 'B': '🥉', 'C': '📊' };
@@ -237,7 +267,7 @@ function createTopChampionsEmbed(position) {
     return embeds;
 }
 
-// Создание сборок embed (С КАРТИНКАМИ)
+// Создание сборок embed (С КАРТИНКАМИ ПРЕДМЕТОВ)
 function createBuildsEmbed(position) {
     const champions = LOL_CHAMPIONS[position];
     if (!champions) return null;
@@ -259,16 +289,38 @@ function createBuildsEmbed(position) {
     // Каждая сборка отдельным embed
     for (let i = 0; i < Math.min(champions.length, 3); i++) {
         const champ = champions[i];
+
+        // Создаём embed для сборки
         const buildEmbed = new EmbedBuilder()
             .setColor(getTierColor(champ.tier))
             .setTitle(`${getTierEmoji(champ.tier)} ${champ.name} — ${champ.tier} Tier`)
             .setDescription(`**Win Rate:** ${champ.winRate}`)
-            .addFields(
-                { name: '🔮 Руна', value: champ.rune, inline: true },
-                { name: '🛡 Предметы', value: champ.items.join(' → '), inline: false }
-            )
-            .setThumbnail(getChampionImage(champ.name)); // Маленькая картинка справа
+            .setThumbnail(getChampionImage(champ.name));
+
+        // Добавляем руны
+        buildEmbed.addFields({ name: '🔮 Руна', value: champ.rune, inline: true });
+
+        // Добавляем каждый предмет с картинкой
+        for (let j = 0; j < champ.items.length; j++) {
+            const item = champ.items[j];
+            const itemEmoji = j === 0 ? '1️⃣' : j === 1 ? '2️⃣' : '3️⃣';
+            buildEmbed.addFields({
+                name: `${itemEmoji} ${item}`,
+                value: `[Картинка предмета](${getItemImage(item)})`,
+                inline: true
+            });
+        }
+
         embeds.push(buildEmbed);
+
+        // Добавляем отдельный embed с картинкой предмета (первый предмет)
+        if (champ.items.length > 0) {
+            const itemEmbed = new EmbedBuilder()
+                .setColor(0x5865f2)
+                .setTitle(`🛡 Предметы ${champ.name}`)
+                .setImage(getItemImage(champ.items[0]));
+            embeds.push(itemEmbed);
+        }
     }
 
     return embeds;
