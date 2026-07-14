@@ -1647,29 +1647,75 @@ client.on('ready', () => {
     console.log(`✅ Бот ${client.user.tag} запущен!`);
     client.user.setActivity('!help | Играю в игры', { type: ActivityType.Playing });
 
-    // Запускаем авто-обновление игровых новостей каждые 30 минут
-    console.log('🎮 Запускаю авто-обновление игровых новостей...');
-    postNewsToChannel(client); // Первый запуск сразу
-    setInterval(() => postNewsToChannel(client), 30 * 60 * 1000); // каждые 30 минут
+    // ==================== РАСПИСАНИЕ ОБНОВЛЕНИЙ ====================
 
-    // Авто-обновление LOL контента (Tier List + Сборки) каждый час
-    console.log('⚔️ Запускаю авто-обновление LOL контента...');
+    // Функция проверки времени
+    function isUpdateHour(hours) {
+        const now = new Date().getHours();
+        return hours.includes(now);
+    }
+
+    // 📰 ИГРОВЫЕ НОВОСТИ - каждые 4 часа (10:00, 14:00, 18:00, 22:00)
+    const newsHours = [10, 14, 18, 22];
+    console.log(`📰 Игровые новости: ${newsHours.join(':00, ')}:00`);
+
+    // ⚔️ LOL TIER LIST - каждые 6 часов (09:00, 15:00, 21:00)
+    const tierListHours = [9, 15, 21];
+    console.log(`⚔️ LOL Tier List: ${tierListHours.join(':00, ')}:00`);
+
+    // 🛡 LOL СБОРКИ - каждые 8 часов (10:00, 18:00)
+    const buildsHours = [10, 18];
+    console.log(`🛡 LOL Сборки: ${buildsHours.join(':00, ')}:00`);
+
+    // 🏆 LOL РЕЙТИНГ - каждые 12 часов (12:00, 00:00)
+    const ratingHours = [0, 12];
+    console.log(`🏆 LOL Рейтинг: ${ratingHours.join(':00, ')}:00`);
+
+    // Проверяем каждые 30 минут
     setInterval(async () => {
-        for (const [, guild] of client.guilds.cache) {
-            const lolChannel = guild.channels.cache.find(ch => ch.name.includes('lol'));
-            if (!lolChannel) continue;
+        const currentHour = new Date().getHours();
 
-            // Публикуем Tier List
-            await lolChannel.send({ embeds: [createTierListEmbed()] }).catch(() => {});
-
-            // Публикуем топ сборок по ролям
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await lolChannel.send({ embeds: [createBuildsEmbed('mid')] }).catch(() => {});
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await lolChannel.send({ embeds: [createRatingEmbed()] }).catch(() => {});
+        // 📰 Игровые новости
+        if (newsHours.includes(currentHour)) {
+            console.log('📰 Обновляю игровые новости...');
+            await postNewsToChannel(client);
         }
-    }, 60 * 60 * 1000); // каждый час
+
+        // ⚔️ LOL Tier List
+        if (tierListHours.includes(currentHour)) {
+            console.log('⚔️ Обновляю LOL Tier List...');
+            for (const [, guild] of client.guilds.cache) {
+                const lolChannel = guild.channels.cache.find(ch => ch.name.includes('lol'));
+                if (lolChannel) {
+                    await lolChannel.send({ embeds: [createTierListEmbed()] }).catch(() => {});
+                }
+            }
+        }
+
+        // 🛡 LOL Сборки
+        if (buildsHours.includes(currentHour)) {
+            console.log('🛡 Обновляю LOL Сборки...');
+            for (const [, guild] of client.guilds.cache) {
+                const lolChannel = guild.channels.cache.find(ch => ch.name.includes('lol'));
+                if (lolChannel) {
+                    await lolChannel.send({ embeds: [createBuildsEmbed('mid')] }).catch(() => {});
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await lolChannel.send({ embeds: [createBuildsEmbed('adc')] }).catch(() => {});
+                }
+            }
+        }
+
+        // 🏆 LOL Рейтинг
+        if (ratingHours.includes(currentHour)) {
+            console.log('🏆 Обновляю LOL Рейтинг...');
+            for (const [, guild] of client.guilds.cache) {
+                const lolChannel = guild.channels.cache.find(ch => ch.name.includes('lol'));
+                if (lolChannel) {
+                    await lolChannel.send({ embeds: [createRatingEmbed()] }).catch(() => {});
+                }
+            }
+        }
+    }, 30 * 60 * 1000); // Проверяем каждые 30 минут
 });
 
 client.on('messageCreate', async (message) => {
