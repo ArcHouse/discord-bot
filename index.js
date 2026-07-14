@@ -1136,6 +1136,38 @@ commands.set('gamenews', {
                 )
                 .setTimestamp();
             msg.edit({ embeds: [successEmbed] });
+
+            // Отправляем приветственное сообщение в канал новостей
+            const welcomeEmbed = new EmbedBuilder()
+                .setColor(0x5865f2)
+                .setTitle('🎮 Добро пожаловать в ИГРОВЫЕ НОВОСТИ!')
+                .setDescription('Здесь вы найдёте последние игровые новости и гайды по League of Legends!')
+                .addFields(
+                    { name: '📰 Что здесь есть?', value: '• Игровые новости из 5 источников\n• LOL Tier List и сборки\n• Рейтинги чемпионов\n• Контры для вашего чемпиона', inline: false },
+                    { name: '⏰ Авто-обновление', value: '• Новости: каждые 4 часа\n• LOL Tier List: каждые 6 часов\n• LOL Сборки: каждые 8 часов', inline: false },
+                    { name: '📜 Команды', value: '`!tierlist` `!builds` `!rating` `!counter` `!lolnews`', inline: false },
+                    { name: '💡 Совет', value: 'Используйте `!help` для списка всех команд!', inline: false }
+                )
+                .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
+                .setFooter({ text: 'Бот: Зохан младший | Авто-обновление 24/7' })
+                .setTimestamp();
+            await gameNewsChannel.send({ embeds: [welcomeEmbed] });
+
+            // Отправляем приветственное сообщение в LOL канал
+            const lolWelcomeEmbed = new EmbedBuilder()
+                .setColor(0xffd700)
+                .setTitle('⚔️ League of Legends - Гайды и Статистика')
+                .setDescription('Всё для LOL: Tier List, сборки, рейтинги и контры!')
+                .addFields(
+                    { name: '📊 Tier List', value: 'Текущий рейтинг чемпионов по тирам', inline: true },
+                    { name: '🛡 Топ Сборки', value: 'Лучшие сборки по позициям', inline: true },
+                    { name: '🏆 Рейтинг', value: 'Топ-5 чемпионов по Win Rate', inline: true },
+                    { name: '📜 Команды', value: '`!tierlist` - Tier List\n`!builds mid` - Сборки (mid/adc/support/jungle/top)\n`!rating` - Рейтинг\n`!counter Locke` - Контры чемпиона\n`!lolnews` - Новости LOL', inline: false }
+                )
+                .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
+                .setFooter({ text: 'Данные: OP.GG | Обновляется автоматически' })
+                .setTimestamp();
+            await lolChannel.send({ embeds: [lolWelcomeEmbed] });
         } catch (err) {
             console.error('❌ Ошибка gamenews:', err);
             msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
@@ -1293,6 +1325,40 @@ commands.set('lolnews', {
         } catch (err) {
             msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
         }
+    }
+});
+
+// --- ПОМОЩЬ ПО LOL ---
+
+commands.set('lolhelp', {
+    name: 'lolhelp',
+    description: 'Подробная помощь по LOL командам',
+    usage: '!lolhelp',
+    async execute(message) {
+        const embed = new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle('⚔️ ПОМОЩЬ ПО LEAGUE OF LEGENDS')
+            .setDescription('Все команды для LOL с примерами:')
+            .addFields(
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**📊 TIER LIST**', inline: false },
+                { name: '`!tierlist`', value: 'Показать текущий Tier List чемпионов\nПример: `!tierlist`', inline: false },
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡 СБОРКИ**', inline: false },
+                { name: '`!builds [позиция]`', value: 'Топ сборки по позиции\nПозиции: `mid` `adc` `support` `jungle` `top`\nПример: `!builds mid`', inline: false },
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🏆 РЕЙТИНГ**', inline: false },
+                { name: '`!rating`', value: 'Рейтинг чемпионов по позициям\nПример: `!rating`', inline: false },
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡 КОНТРЫ**', inline: false },
+                { name: '`!counter [чемпион]`', value: 'Лучшие контры против чемпиона\nПример: `!counter Locke`', inline: false },
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**📰 НОВОСТИ**', inline: false },
+                { name: '`!lolnews`', value: 'Последние новости League of Legends\nПример: `!lolnews`', inline: false },
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**⏰ АВТО-ОБНОВЛЕНИЕ**', inline: false },
+                { name: 'Tier List', value: 'Каждые 6 часов (09:00, 15:00, 21:00)', inline: true },
+                { name: 'Сборки', value: 'Каждые 8 часов (10:00, 18:00)', inline: true },
+                { name: 'Рейтинг', value: 'Каждые 12 часов (00:00, 12:00)', inline: true }
+            )
+            .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
+            .setFooter({ text: 'Данные: OP.GG | Все данные на русском языке' })
+            .setTimestamp();
+        message.channel.send({ embeds: [embed] });
     }
 });
 
@@ -1553,7 +1619,7 @@ commands.set('help', {
                 { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
                 { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!modcommands` `!help`' },
                 { name: '🎮 Новости', value: '`!gamenews` `!news`' },
-                { name: '⚔️ League of Legends', value: '`!tierlist` `!builds` `!rating` `!counter` `!lolnews`' },
+                { name: '⚔️ League of Legends', value: '`!tierlist` `!builds` `!rating` `!counter` `!lolnews` `!lolhelp`' },
                 { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
@@ -1795,6 +1861,9 @@ client.on('guildMemberAdd', async (member) => {
             .setTitle('👋 Добро пожаловать!')
             .setDescription(`Привет, ${member}! Добро пожаловать на сервер **${member.guild.name}**!`)
             .addFields(
+                { name: '🎮 Игровые новости', value: 'Загляни в канал **#🎮-новости** — там последние игровые новости!', inline: false },
+                { name: '⚔️ LOL Гайды', value: 'Играешь в LOL? Смотри **#⚔️-lol-гайды** — Tier List, сборки, рейтинги!', inline: false },
+                { name: '📜 Команды', value: 'Напиши `!help` чтобы узнать все команды бота!', inline: false },
                 { name: 'Участников', value: `${member.guild.memberCount}`, inline: true },
                 { name: 'Создан', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
             )
