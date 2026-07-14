@@ -590,6 +590,86 @@ commands.set('setup', {
     }
 });
 
+// --- ВЕРИФИКАЦИЯ ---
+
+commands.set('verify', {
+    name: 'verify',
+    description: 'Создать систему верификации',
+    usage: '!verify #канал',
+    async execute(message, args) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может настраивать верификацию!');
+        }
+
+        const channel = message.mentions.channels.first() || message.guild.channels.cache.find(ch => ch.name === (args[0] || '').replace('#', ''));
+        if (!channel) return message.reply('❌ Укажи канал: !verify #.verify');
+
+        let verifiedRole = message.guild.roles.cache.find(r => r.name === 'Verified');
+        if (!verifiedRole) {
+            verifiedRole = await message.guild.roles.create({
+                name: 'Verified',
+                color: 0x00ff00,
+            }).catch(() => null);
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('✅ Верификация')
+            .setDescription('Нажми ✅ чтобы подтвердить, что ты не бот, и получить доступ к серверу!')
+            .setFooter({ text: 'Без верификации ты не сможешь писать в чатах.' })
+            .setTimestamp();
+
+        const msg = await channel.send({ embeds: [embed] });
+        await msg.react('✅');
+
+        message.reply(`✅ Верификация настроена в ${channel}`);
+    }
+});
+
+// --- ПРАВИЛА ---
+
+commands.set('rules', {
+    name: 'rules',
+    description: 'Опубликовать правила сервера',
+    usage: '!rules',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может публиковать правила!');
+        }
+
+        const rulesChannel = message.guild.channels.cache.find(ch => ch.name === '📜-правила');
+        if (!rulesChannel) return message.reply('❌ Канал #📜-правила не найден!');
+
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('📜 ПРАВИЛА СЕРВЕРА')
+            .setDescription('Добро пожаловать на **Сервер ZOHAN**! Пожалуйста, ознакомьтесь с правилами перед использованием сервера.')
+            .addFields(
+                { name: '1️⃣ Уважение', value: 'Уважайте других участников. Запрещены оскорбления, дискриминация, расизм и любые формы харассмента.' },
+                { name: '2️⃣ Спам и реклама', value: 'Запрещён спам, массовые сообщения, реклама других серверов, ботов и товаров без разрешения администратора.' },
+                { name: '3️⃣ Ссылки', value: 'Запрещены сторонние ссылки в чатах. Исключение — ссылки в #🎮-игры с разрешения модератора.' },
+                { name: '4️⃣ Голосовые каналы', value: 'Запрещён крик, микрофон-спам, звуковые эффекты без согласия участников. Уважайте чужое пространство.' },
+                { name: '5️⃣ NSFW контент', value: 'Запрещён порнографический, жестокий и любой 18+ контент. За нарушение — бан.' },
+                { name: '6️⃣ Личные данные', value: 'Запрещено публиковать личные данные других людей (адреса, телефоны, фото) без их согласия.' },
+                { name: '7️⃣ Мультиаккаунты', value: 'Запрещено использование нескольких аккаунтов для обхода бана или мута.' },
+                { name: '8️⃣ Админы', value: 'Следуйте инструкциям модераторов и администраторов. Их решения окончательны.' },
+                { name: '9️⃣ Музыка', value: 'Используйте бота музыки только в голосовых каналах. Не злоупотребляйте командами.' },
+                { name: '🔟 Здравый смысл', value: 'Если действие может навредить серверу или участникам — не делайте его.' }
+            )
+            .setFooter({ text: 'Нарушение правил ведёт к муту, кику или бану. Приятного общения! 🎮' })
+            .setTimestamp();
+
+        await rulesChannel.send({ embeds: [embed] });
+
+        const successEmbed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('✅ Правила опубликованы!')
+            .setDescription(`Правила отправлены в ${rulesChannel}`)
+            .setTimestamp();
+        message.channel.send({ embeds: [successEmbed] });
+    }
+});
+
 // --- ПОМОЩЬ ---
 
 commands.set('help', {
@@ -606,8 +686,8 @@ commands.set('help', {
                 { name: '🎵 Музыка', value: '`!play` `!skip` `!stop` `!queue`' },
                 { name: '🎉 Розыгрыши', value: '`!giveaway`' },
                 { name: '📊 Опросы', value: '`!poll`' },
-                { name: '🎭 Роли', value: '`!reactrole`' },
-                { name: '⚙️ Сервер', value: '`!setup` `!welcome` `!autorole` `!help`' },
+                { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
+                { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!help`' },
                 { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
@@ -929,7 +1009,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// РЕАКЦИИ: обработка Reaction Roles
+// РЕАКЦИИ: обработка Reaction Roles и Верификация
 client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
     if (reaction.message.partial) await reaction.message.fetch();
@@ -937,9 +1017,14 @@ client.on('messageReactionAdd', async (reaction, user) => {
     const guild = reaction.message.guild;
     const member = guild.members.cache.get(user.id);
 
-    // Проверяем reactrole сообщения
-    for (const [, roleData] of guild.roles.cache) {
-        // Пропускаем
+    // Верификация
+    if (reaction.emoji.name === '✅') {
+        const verifiedRole = guild.roles.cache.find(r => r.name === 'Verified');
+        if (verifiedRole && !member.roles.cache.has(verifiedRole.id)) {
+            await member.roles.add(verifiedRole).catch(() => {});
+            const ch = guild.channels.cache.find(ch => ch.name === '👋-общение');
+            if (ch) ch.send(`✅ ${member} верифицирован! Добро пожаловать!`).then(m => setTimeout(() => m.delete(), 5000));
+        }
     }
 });
 
