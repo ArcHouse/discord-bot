@@ -8,7 +8,7 @@ dotenv.config();
 
 // Антиспам хранилище
 const spamTracker = new Map();
-const SPAM_LIMIT = 8;
+const SPAM_LIMIT = 30;
 const SPAM_TIME = 10000;
 
 // Настройка прокси если указан
@@ -729,7 +729,7 @@ commands.set('commands', {
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**🎉 РАЗВЛЕЧЕНИЯ**', inline: false },
                 { name: '`!poll Вопрос | Вариант1 | Вариант2`', value: 'Создать опрос', inline: false },
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ АВТО**', inline: false },
-                { name: 'Анти-спам', value: '8+ сообщений за 10 сек = предупреждение, потом мут', inline: true },
+                { name: 'Анти-спам', value: '30+ сообщений за 10 сек = мут', inline: true },
                 { name: 'Анти-ссылки', value: 'Ссылки запрещены (кроме игр, музыки, бот-команд)', inline: true }
             )
             .setFooter({ text: 'Бот: Зохан младший • Музыка: Jockie Music' })
