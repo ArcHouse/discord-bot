@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const { Player } = require('discord-player');
+const { extractors, DefaultExtractors } = require('@discord-player/extractor');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -34,6 +35,11 @@ if (process.env.PROXY) {
 const client = new Client(clientOptions);
 
 const player = new Player(client);
+
+// Регистрация экстракторов для YouTube и других источников
+player.extractors.loadDefault().then(() => {
+    console.log('🎵 Экстракторы музыки загружены!');
+});
 
 // ==================== КОМАНДЫ ====================
 
