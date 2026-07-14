@@ -1126,7 +1126,7 @@ client.on('messageCreate', async (message) => {
     }
 
     // Анти-ссылки (разрешены в каналах: игры, музыка, бот-команды)
-    const allowedChannels = ['🎮-игры', '🎵-музыка', '🤖-бот-команды', '👋-общение'];
+    const allowedChannels = ['🎮-игры', '🎵-музыка', '🤖-бот-команды', '👋-общение', 'общее'];
     const urlRegex = /https?:\/\/[^\s]+|www\.[^\s]+/i;
     if (urlRegex.test(message.content) && !allowedChannels.includes(message.channel.name)) {
         try {
