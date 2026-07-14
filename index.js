@@ -8,8 +8,8 @@ dotenv.config();
 
 // Антиспам хранилище
 const spamTracker = new Map();
-const SPAM_LIMIT = 5;
-const SPAM_TIME = 5000;
+const SPAM_LIMIT = 8;
+const SPAM_TIME = 10000;
 
 // Настройка прокси если указан
 const clientOptions = {
@@ -729,8 +729,8 @@ commands.set('commands', {
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**🎉 РАЗВЛЕЧЕНИЯ**', inline: false },
                 { name: '`!poll Вопрос | Вариант1 | Вариант2`', value: 'Создать опрос', inline: false },
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ АВТО**', inline: false },
-                { name: 'Анти-спам', value: '5+ сообщений за 5 сек = мут', inline: true },
-                { name: 'Анти-ссылки', value: 'Ссылки удаляются автоматически', inline: true }
+                { name: 'Анти-спам', value: '8+ сообщений за 10 сек = предупреждение, потом мут', inline: true },
+                { name: 'Анти-ссылки', value: 'Ссылки запрещены (кроме игр, музыки, бот-команд)', inline: true }
             )
             .setFooter({ text: 'Бот: Зохан младший • Музыка: Jockie Music' })
             .setTimestamp();
@@ -1100,15 +1100,18 @@ client.on('messageCreate', async (message) => {
             await message.delete();
             const mute = message.guild.roles.cache.find(r => r.name === 'Muted');
             if (mute) await message.member.roles.add(mute);
-            const warn = await message.channel.send(`⚠️ ${message.author}, замучен за спам! (${SPAM_LIMIT} сообщений за ${SPAM_TIME / 1000} сек)`);
-            setTimeout(() => warn.delete(), 5000);
+            const warn = await message.channel.send(`⚠️ ${message.author}, замучен на 1 минуту за спам!`);
+            setTimeout(() => {
+                if (mute) message.member.roles.remove(mute).catch(() => {});
+            }, 60000);
+            setTimeout(() => warn.delete(), 8000);
 
             const logChannel = message.guild.channels.cache.find(ch => ch.name === '📋-логи');
             if (logChannel) {
                 const embed = new EmbedBuilder()
                     .setColor(0xffa500)
                     .setTitle('⚠️ Анти-спам')
-                    .setDescription(`${message.author.tag} замучен за спам`)
+                    .setDescription(`${message.author.tag} замучен на 1 минуту за спам`)
                     .setTimestamp();
                 logChannel.send({ embeds: [embed] });
             }
@@ -1116,12 +1119,19 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // Анти-ссылки
+    // Предупреждение за спам
+    if (recent.length === SPAM_LIMIT - 1) {
+        const warn = await message.channel.send(`⚠️ ${message.author}, замедли! Следующее сообщение = мут.`);
+        setTimeout(() => warn.delete(), 4000);
+    }
+
+    // Анти-ссылки (разрешены в каналах: игры, музыка, бот-команды)
+    const allowedChannels = ['🎮-игры', '🎵-музыка', '🤖-бот-команды', '👋-общение'];
     const urlRegex = /https?:\/\/[^\s]+|www\.[^\s]+/i;
-    if (urlRegex.test(message.content)) {
+    if (urlRegex.test(message.content) && !allowedChannels.includes(message.channel.name)) {
         try {
             await message.delete();
-            const warn = await message.channel.send(`🚫 ${message.author}, ссылки запрещены!`);
+            const warn = await message.channel.send(`🚫 ${message.author}, ссылки запрещены в этом канале!`);
             setTimeout(() => warn.delete(), 3000);
         } catch (err) {}
     }
