@@ -430,6 +430,28 @@ async function fetchGameNews() {
     return allNews.slice(0, 20); // Топ 20 новостей
 }
 
+// Функция получения LOL новостей
+async function fetchLoLNews() {
+    const allNews = [];
+    for (const feed of LOL_RSS_FEEDS) {
+        try {
+            const data = await rssParser.parseURL(feed.url);
+            const items = data.items.slice(0, 3).map(item => ({
+                title: item.title,
+                link: item.link,
+                date: item.pubDate || item.isoDate,
+                source: feed.name,
+                emoji: feed.emoji,
+                content: item.contentSnippet || item.content || ''
+            }));
+            allNews.push(...items);
+        } catch (err) {
+            console.log('⚠️ LOL RSS ошибка:', feed.name, err.message);
+        }
+    }
+    return allNews.slice(0, 10);
+}
+
 // Функция публикации новости в канал
 async function postNewsToChannel(client) {
     try {
@@ -1945,6 +1967,31 @@ client.on('ready', () => {
         if (newsHours.includes(currentHour)) {
             console.log('📰 Обновляю игровые новости...');
             await postNewsToChannel(client);
+        }
+
+        // 🎮 LOL новости (в канал lol-новости)
+        if (newsHours.includes(currentHour)) {
+            console.log('🎮 Обновляю LOL новости...');
+            for (const [, guild] of client.guilds.cache) {
+                const lolNewsChannel = guild.channels.cache.find(ch => 
+                    ch.name.includes('lol-новости') || ch.name.includes('lol-novosti')
+                );
+                if (lolNewsChannel) {
+                    console.log('🎮 Канал LOL новостей найден:', lolNewsChannel.name);
+                    const lolNews = await fetchLoLNews();
+                    console.log('🎮 Получено LOL новостей:', lolNews.length);
+                    for (const item of lolNews) {
+                        const embed = new EmbedBuilder()
+                            .setColor(0xffd700)
+                            .setTitle(`${item.emoji} ${item.title}`)
+                            .setDescription(item.content.substring(0, 300) + '...')
+                            .setURL(item.link)
+                            .setTimestamp();
+                        await lolNewsChannel.send({ embeds: [embed] }).catch(() => {});
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+            }
         }
 
         // ⚔️ LOL Tier List (в канал lol-гайды)
