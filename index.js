@@ -698,6 +698,83 @@ commands.set('rules', {
     }
 });
 
+// --- КОМАНДЫ В КАНАЛ ---
+
+commands.set('commands', {
+    name: 'commands',
+    description: 'Создать канал со списком всех команд',
+    usage: '!commands #канал',
+    async execute(message, args) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может создавать канал команд!');
+        }
+
+        const channel = message.mentions.channels.first() || message.guild.channels.cache.find(ch => ch.name === (args[0] || '').replace('#', ''));
+        if (!channel) return message.reply('❌ Укажи канал: !commands #🤖-бот-команды');
+
+        const embed1 = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('📚 ВСЕ КОМАНДЫ БОТА')
+            .setDescription('Полный список команд сервера **Сервер ZOHAN**')
+            .addFields(
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ МОДЕРАЦИЯ**', inline: false },
+                { name: '`!kick @user [причина]`', value: 'Выгнать участника с сервера', inline: true },
+                { name: '`!ban @user [причина]`', value: 'Забанить участника', inline: true },
+                { name: '`!unban ID`', value: 'Разбанить участника', inline: true },
+                { name: '`!mute @user [минуты]`', value: 'Замутить участника', inline: true },
+                { name: '`!unmute @user`', value: 'Размутить участника', inline: true },
+                { name: '`!clear [кол-во]`', value: 'Удалить сообщения', inline: true }
+            )
+            .setFooter({ text: 'Страница 1 из 3' })
+            .setTimestamp();
+        await channel.send({ embeds: [embed1] });
+
+        const embed2 = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('📚 ВСЕ КОМАНДЫ БОТА')
+            .addFields(
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🎮 МИНИ-ИГРЫ**', inline: false },
+                { name: '`!random [число]`', value: 'Угадай число от 1 до 100', inline: true },
+                { name: '`!rps [камень/ножницы/бумага]`', value: 'Камень-ножницы-бумага', inline: true },
+                { name: '`!roulette [число] [цвет]`', value: 'Рулетка (красный/чёрный/зелёный)', inline: true },
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🎵 МУЗЫКА** (Jockie Music)', inline: false },
+                { name: '`m!play [название/ссылка]`', value: 'Включить музыку', inline: true },
+                { name: '`m!skip`', value: 'Пропустить трек', inline: true },
+                { name: '`m!stop`', value: 'Остановить музыку', inline: true },
+                { name: '`m!leave`', value: 'Бот выходит из голосового', inline: true }
+            )
+            .setFooter({ text: 'Страница 2 из 3' })
+            .setTimestamp();
+        await channel.send({ embeds: [embed2] });
+
+        const embed3 = new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle('📚 ВСЕ КОМАНДЫ БОТА')
+            .addFields(
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🎉 РАЗВЛЕЧЕНИЯ**', inline: false },
+                { name: '`!poll Вопрос | Вариант1 | Вариант2`', value: 'Создать опрос', inline: false },
+                { name: '`!giveaway время | приз | описание`', value: 'Создать розыгрыш (секунды)', inline: false },
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**⚙️ НАСТРОЙКА СЕРВЕРА**', inline: false },
+                { name: '`!setup`', value: 'Автосоздание структуры сервера', inline: true },
+                { name: '`!rules`', value: 'Опубликовать правила', inline: true },
+                { name: '`!welcome #канал`', value: 'Настроить приветствие', inline: true },
+                { name: '`!autorole @роль`', value: 'Настроить автос роль', inline: true },
+                { name: '`!verify #канал`', value: 'Настроить верификацию', inline: true },
+                { name: '`!commands #канал`', value: 'Этот список команд', inline: true },
+                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ АВТОМАТИЧЕСКИ**', inline: false },
+                { name: 'Анти-спам', value: '5+ сообщений за 5 сек = мут', inline: true },
+                { name: 'Анти-ссылки', value: 'Ссылки от обычных участников удаляются', inline: true },
+                { name: 'Логирование', value: 'Удаление/редактирование в #📋-логи', inline: true },
+                { name: 'Прощание', value: 'Сообщение когда кто-то вышел', inline: true }
+            )
+            .setFooter({ text: 'Страница 3 из 3 • Наш бот: Зохан младший • Музыка: Jockie Music' })
+            .setTimestamp();
+        await channel.send({ embeds: [embed3] });
+
+        message.reply(`✅ Список команд отправлен в ${channel}`);
+    }
+});
+
 // --- ПОМОЩЬ ---
 
 commands.set('help', {
@@ -715,7 +792,7 @@ commands.set('help', {
                 { name: '🎉 Розыгрыши', value: '`!giveaway`' },
                 { name: '📊 Опросы', value: '`!poll`' },
                 { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
-                { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!help`' },
+                { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!help`' },
                 { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
