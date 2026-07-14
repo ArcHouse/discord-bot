@@ -124,6 +124,68 @@ async function fetchLoLYouTube() {
     return allVideos.slice(0, 5);
 }
 
+// ==================== TWITCH УВЕДОМЛЕНИЯ ====================
+
+// Twitch каналы для отслеживания
+const TWITCH_CHANNELS = [
+    { name: 'ZOHAN', login: 'zohan' } // Твой канал
+];
+
+// Хранилище статуса стримов
+const streamStatus = new Map();
+
+// Проверка стримов на Twitch
+async function checkTwitchStreams(client) {
+    for (const channel of TWITCH_CHANNELS) {
+        try {
+            // Используем публичный API для проверки статуса
+            const url = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${channel.login}-320x180.jpg`;
+            
+            // Проверяем через fetch
+            const response = await fetch(url, { method: 'HEAD' });
+            const isLive = response.ok;
+            
+            const wasLive = streamStatus.get(channel.login) || false;
+            
+            // Если стрим начался
+            if (isLive && !wasLive) {
+                console.log(`🔴 ${channel.name} начал стрим!`);
+                
+                // Ищем канал объявления
+                for (const [, guild] of client.guilds.cache) {
+                    const announceChannel = guild.channels.cache.find(ch => 
+                        ch.name.includes('объявления') || ch.name.includes('announce')
+                    );
+                    if (announceChannel) {
+                        await announceChannel.send({ embeds: [
+                            new EmbedBuilder()
+                                .setColor(0x9146ff)
+                                .setTitle('🔴 СТРИМ НАЧАЛСЯ!')
+                                .setDescription(`**${channel.name}** начал прямую трансляцию!`)
+                                .addFields(
+                                    { name: '📺 Канал', value: `https://twitch.tv/${channel.login}`, inline: true },
+                                    { name: '🎮 Игра', value: 'League of Legends', inline: true }
+                                )
+                                .setThumbnail(`https://static-cdn.jtvnw.net/jtv_user_pictures/${channel.login}-profile_image-70x70.png`)
+                                .setTimestamp()
+                        ]}).catch(() => {});
+                    }
+                }
+            }
+            
+            // Если стрим закончился
+            if (!isLive && wasLive) {
+                console.log(`⚫ ${channel.name} закончил стрим`);
+            }
+            
+            streamStatus.set(channel.login, isLive);
+            
+        } catch (err) {
+            console.log('⚠️ Twitch ошибка:', err.message.substring(0, 50));
+        }
+    }
+}
+
 // Хранилище опубликованных новостей (чтобы не дублировать)
 const publishedNews = new Set();
 
@@ -1963,10 +2025,13 @@ client.on('ready', () => {
     const youtubeHours = [11, 17, 23];
     console.log(`📺 LOL YouTube: ${youtubeHours.join(':00, ')}:00`);
 
-            // Проверяем каждые 30 минут
+            // Проверяем каждые 5 минут
     setInterval(async () => {
         const currentHour = new Date().getHours();
         console.log(`⏰ Проверяю время: ${currentHour}:00`);
+
+        // 🔴 Проверяем Twitch стримы каждые 5 минут
+        await checkTwitchStreams(client);
 
         // 📰 Игровые новости
         if (newsHours.includes(currentHour)) {
