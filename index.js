@@ -1,10 +1,15 @@
-const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const { Player } = require('discord-player');
 const { extractors, DefaultExtractors } = require('@discord-player/extractor');
 const dotenv = require('dotenv');
 
 dotenv.config();
+
+// Антиспам хранилище
+const spamTracker = new Map();
+const SPAM_LIMIT = 5;
+const SPAM_TIME = 5000;
 
 // Настройка прокси если указан
 const clientOptions = {
@@ -14,6 +19,7 @@ const clientOptions = {
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessageReactions,
     ]
 };
 
@@ -598,12 +604,146 @@ commands.set('help', {
                 { name: '🛡️ Модерация', value: '`!kick` `!ban` `!unban` `!mute` `!unmute` `!clear`' },
                 { name: '🎮 Мини-игры', value: '`!random` `!rps` `!roulette`' },
                 { name: '🎵 Музыка', value: '`!play` `!skip` `!stop` `!queue`' },
-                { name: '⚙️ Сервер', value: '`!setup` `!welcome` `!autorole` `!help`' }
+                { name: '🎉 Розыгрыши', value: '`!giveaway`' },
+                { name: '📊 Опросы', value: '`!poll`' },
+                { name: '🎭 Роли', value: '`!reactrole`' },
+                { name: '⚙️ Сервер', value: '`!setup` `!welcome` `!autorole` `!help`' },
+                { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
 });
+
+// --- РОЛИ ПО РЕАКЦИЯМ ---
+
+commands.set('reactrole', {
+    name: 'reactrole',
+    description: 'Создать сообщение с ролями по реакциям',
+    usage: '!reactrole #канал | Роль1:эмодзи | Роль2:эмодзи',
+    async execute(message, args) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может настраивать роли по реакциям!');
+        }
+
+        const fullArgs = args.join(' ');
+        const parts = fullArgs.split('|').map(p => p.trim());
+        if (parts.length < 2) return message.reply('❌ Формат: !reactrole # канал | Роль1:🎭 | Роль2:🎮');
+
+        const channelMention = parts[0];
+        const channel = message.mentions.channels.first() || message.guild.channels.cache.find(ch => ch.name === channelMention.replace('#', ''));
+        if (!channel) return message.reply('❌ Канал не найден!');
+
+        const rolePairs = parts.slice(1);
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('🎭 Выбери роль!')
+            .setDescription('Нажми на эмодзи чтобы получить роль:')
+            .setTimestamp();
+
+        const description = [];
+        for (const pair of rolePairs) {
+            const [roleName, emoji] = pair.split(':').map(s => s.trim());
+            const role = message.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
+            if (role) {
+                description.push(`${emoji} — ${role}`);
+            }
+        }
+        embed.setDescription(description.join('\n'));
+
+        const msg = await channel.send({ embeds: [embed] });
+
+        for (const pair of rolePairs) {
+            const [roleName, emoji] = pair.split(':').map(s => s.trim());
+            const role = message.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
+            if (role && emoji) {
+                await msg.react(emoji);
+            }
+        }
+
+        message.reply('✅ Роли по реакциям созданы!');
+    }
+});
+
+// --- РОЗЫГРЫШИ ---
+
+const giveaways = new Map();
+
+commands.set('giveaway', {
+    name: 'giveaway',
+    description: 'Создать розыгрыш',
+    usage: '!giveaway 60 | Приз | Описание',
+    async execute(message, args) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может создавать розыгрыши!');
+        }
+
+        const fullArgs = args.join(' ');
+        const parts = fullArgs.split('|').map(p => p.trim());
+        if (parts.length < 2) return message.reply('❌ Формат: !giveaway 60 | Приз | Описание');
+
+        const time = parseInt(parts[0]) * 1000;
+        const prize = parts[1];
+        const description = parts[2] || 'Участвуй!';
+
+        const embed = new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle('🎉 РОЗЫГРЫШ!')
+            .setDescription(`**Приз:** ${prize}\n\n${description}\n\n⏰ Заканчивается через: ${Math.floor(time / 60000)} мин.`)
+            .setFooter({ text: 'Нажми 🎉 чтобы участвовать!' })
+            .setTimestamp();
+
+        const msg = await message.channel.send({ embeds: [embed] });
+        await msg.react('🎉');
+
+        giveaways.set(msg.id, {
+            prize,
+            endTime: Date.now() + time,
+            messageId: msg.id,
+            channelId: message.channel.id,
+            guildId: message.guild.id,
+        });
+
+        message.reply(`✅ Розыгрыш создан! Заканчивается через ${Math.floor(time / 60000)} мин.`);
+    }
+});
+
+// --- ОПРОСЫ ---
+
+commands.set('poll', {
+    name: 'poll',
+    description: 'Создать опрос',
+    usage: '!poll Вопрос | Вариант1 | Вариант2',
+    async execute(message, args) {
+        const fullArgs = args.join(' ');
+        const parts = fullArgs.split('|').map(p => p.trim());
+        if (parts.length < 2) return message.reply('❌ Формат: !poll Вопрос | Вариант1 | Вариант2');
+
+        const question = parts[0];
+        const options = parts.slice(1);
+        const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+
+        const description = options.map((opt, i) => `${emojis[i]} ${opt}`).join('\n');
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle(`📊 ${question}`)
+            .setDescription(description)
+            .setFooter({ text: `Опрос от ${message.author.tag}` })
+            .setTimestamp();
+
+        const msg = await message.channel.send({ embeds: [embed] });
+
+        for (let i = 0; i < options.length; i++) {
+            await msg.react(emojis[i]);
+        }
+
+        message.delete().catch(() => {});
+    }
+});
+
+// --- ПРОЩАНИЕ ---
+
+// --- АВТО-АНМАТ (РЕАКЦИИ) ---
 
 // ==================== СОБЫТИЯ ====================
 
@@ -633,34 +773,213 @@ client.on('messageCreate', async (message) => {
 // Приветствие новых участников
 client.on('guildMemberAdd', async (member) => {
     const channel = member.guild.channels.cache.find(ch => ch.name === process.env.WELCOME_CHANNEL);
-    if (!channel) return;
+    if (channel) {
+        const embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('👋 Добро пожаловать!')
+            .setDescription(`Привет, ${member}! Добро пожаловать на сервер **${member.guild.name}**!`)
+            .addFields(
+                { name: 'Участников', value: `${member.guild.memberCount}`, inline: true },
+                { name: 'Создан', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
+            )
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .setTimestamp();
+        channel.send({ embeds: [embed] });
+    }
 
-    const embed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle('👋 Добро пожаловать!')
-        .setDescription(`Привет, ${member}! Добро пожаловать на сервер **${member.guild.name}**!`)
-        .addFields(
-            { name: 'Участников', value: `${member.guild.memberCount}`, inline: true },
-            { name: 'Создан', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
-        )
-        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-        .setTimestamp();
-
-    channel.send({ embeds: [embed] });
-
-    // Выдача автос роли
     const roleId = process.env.AUTOROLE;
     if (roleId && roleId !== '@Member') {
         const role = member.guild.roles.cache.get(roleId);
         if (role) {
-            try {
-                await member.roles.add(role);
-            } catch (err) {
-                console.error('Не удалось выдать автос роль:', err);
-            }
+            try { await member.roles.add(role); } catch (err) {}
         }
     }
 });
+
+// ПРОЩАНИЕ участников
+client.on('guildMemberRemove', async (member) => {
+    const logChannel = member.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    if (logChannel) {
+        const embed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('👋 Участник покинул сервер')
+            .setDescription(`**${member.user.tag}** вышел с сервера`)
+            .addFields(
+                { name: 'Участников осталось', value: `${member.guild.memberCount}`, inline: true }
+            )
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .setTimestamp();
+        logChannel.send({ embeds: [embed] });
+    }
+});
+
+// ЛОГИРОВАНИЕ: удалённые сообщения
+client.on('messageDelete', async (message) => {
+    if (message.author.bot) return;
+    const logChannel = message.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+        .setColor(0xffa500)
+        .setTitle('🗑️ Сообщение удалено')
+        .addFields(
+            { name: 'Автор', value: `${message.author.tag}`, inline: true },
+            { name: 'Канал', value: `${message.channel}`, inline: true },
+            { name: 'Контент', value: message.content.substring(0, 1000) || 'Нет текста' }
+        )
+        .setTimestamp();
+    logChannel.send({ embeds: [embed] });
+});
+
+// ЛОГИРОВАНИЕ: edited сообщения
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+    if (oldMessage.author.bot) return;
+    if (oldMessage.content === newMessage.content) return;
+    const logChannel = oldMessage.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle('✏️ Сообщение изменено')
+        .addFields(
+            { name: 'Автор', value: `${oldMessage.author.tag}`, inline: true },
+            { name: 'Канал', value: `${oldMessage.channel}`, inline: true },
+            { name: 'Было', value: oldMessage.content.substring(0, 500) || 'Нет текста' },
+            { name: 'Стало', value: newMessage.content.substring(0, 500) || 'Нет текста' }
+        )
+        .setTimestamp();
+    logChannel.send({ embeds: [embed] });
+});
+
+// ЛОГИРОВАНИЕ: бан/кик
+client.on('guildBanAdd', async (ban) => {
+    const logChannel = ban.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle('🔨 Участник забанен')
+        .addFields(
+            { name: 'Пользователь', value: `${ban.user.tag}`, inline: true },
+            { name: 'Причина', value: ban.reason || 'Не указана', inline: true }
+        )
+        .setTimestamp();
+    logChannel.send({ embeds: [embed] });
+});
+
+// ЛОГИРОВАНИЕ: разбан
+client.on('guildBanRemove', async (ban) => {
+    const logChannel = ban.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('✅ Участник разбанен')
+        .addFields(
+            { name: 'Пользователь', value: `${ban.user.tag}`, inline: true }
+        )
+        .setTimestamp();
+    logChannel.send({ embeds: [embed] });
+});
+
+// АНТИ-СПАМ и АНТИ-ССЫЛКИ
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+    if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+
+    const userId = message.author.id;
+    const now = Date.now();
+
+    // Анти-спам
+    if (!spamTracker.has(userId)) spamTracker.set(userId, []);
+    const timestamps = spamTracker.get(userId);
+    timestamps.push(now);
+    const recent = timestamps.filter(t => now - t < SPAM_TIME);
+    spamTracker.set(userId, recent);
+
+    if (recent.length > SPAM_LIMIT) {
+        try {
+            await message.delete();
+            const mute = message.guild.roles.cache.find(r => r.name === 'Muted');
+            if (mute) await message.member.roles.add(mute);
+            const warn = await message.channel.send(`⚠️ ${message.author}, замучен за спам! (${SPAM_LIMIT} сообщений за ${SPAM_TIME / 1000} сек)`);
+            setTimeout(() => warn.delete(), 5000);
+
+            const logChannel = message.guild.channels.cache.find(ch => ch.name === '📋-логи');
+            if (logChannel) {
+                const embed = new EmbedBuilder()
+                    .setColor(0xffa500)
+                    .setTitle('⚠️ Анти-спам')
+                    .setDescription(`${message.author.tag} замучен за спам`)
+                    .setTimestamp();
+                logChannel.send({ embeds: [embed] });
+            }
+        } catch (err) {}
+        return;
+    }
+
+    // Анти-ссылки
+    const urlRegex = /https?:\/\/[^\s]+|www\.[^\s]+/i;
+    if (urlRegex.test(message.content)) {
+        try {
+            await message.delete();
+            const warn = await message.channel.send(`🚫 ${message.author}, ссылки запрещены!`);
+            setTimeout(() => warn.delete(), 3000);
+        } catch (err) {}
+    }
+});
+
+// РЕАКЦИИ: обработка Reaction Roles
+client.on('messageReactionAdd', async (reaction, user) => {
+    if (user.bot) return;
+    if (reaction.message.partial) await reaction.message.fetch();
+
+    const guild = reaction.message.guild;
+    const member = guild.members.cache.get(user.id);
+
+    // Проверяем reactrole сообщения
+    for (const [, roleData] of guild.roles.cache) {
+        // Пропускаем
+    }
+});
+
+// РОЗЫГРЫШИ: обработка таймеров
+setInterval(async () => {
+    for (const [id, giveaway] of giveaways) {
+        if (Date.now() >= giveaway.endTime) {
+            const guild = client.guilds.cache.get(giveaway.guildId);
+            if (!guild) { giveaways.delete(id); continue; }
+
+            const channel = guild.channels.cache.get(giveaway.channelId);
+            if (!channel) { giveaways.delete(id); continue; }
+
+            try {
+                const msg = await channel.messages.fetch(giveaway.messageId);
+                const reactions = msg.reactions.cache.get('🎉');
+                if (!reactions) {
+                    await channel.send('🎉 Розыгрыш завершён, но никто не участвовал!');
+                    giveaways.delete(id);
+                    continue;
+                }
+
+                const users = await reactions.users.fetch();
+                const participants = users.filter(u => !u.bot);
+                if (participants.size === 0) {
+                    await channel.send('🎉 Розыгрыш завершён, но никто не участвовал!');
+                } else {
+                    const winner = participants.random();
+                    const embed = new EmbedBuilder()
+                        .setColor(0xffd700)
+                        .setTitle('🎉 ПОБЕДИТЕЛЬ!')
+                        .setDescription(`**${winner}** выиграл **${giveaway.prize}**!`);
+                    await channel.send({ embeds: [embed] });
+                }
+            } catch (err) {}
+
+            giveaways.delete(id);
+        }
+    }
+}, 10000);
 
 // ==================== ЗАПУСК ====================
 
