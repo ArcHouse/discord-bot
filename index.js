@@ -498,6 +498,92 @@ commands.set('autorole', {
     }
 });
 
+// --- СЕРВЕР ---
+
+commands.set('setup', {
+    name: 'setup',
+    description: 'Создать красивую структуру сервера',
+    usage: '!setup',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может настроить сервер!');
+        }
+
+        const guild = message.guild;
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('⚙️ Создаю структуру сервера...')
+            .setDescription('Подожди несколько секунд...')
+            .setTimestamp();
+        const msg = await message.channel.send({ embeds: [embed] });
+
+        try {
+            // Удаляем существующие каналы (кроме текущего)
+            for (const [, channel] of guild.channels.cache) {
+                if (channel.id !== message.channel.id && channel.type !== 4) {
+                    await channel.delete().catch(() => {});
+                }
+            }
+            for (const [, channel] of guild.channels.cache) {
+                if (channel.id !== message.channel.id && channel.type === 4) {
+                    await channel.delete().catch(() => {});
+                }
+            }
+
+            // Создаём роли
+            const roleAdmin = await guild.roles.create({ name: 'Admin', color: 0xff0000, permissions: [PermissionsBitField.Flags.Administrator] }).catch(() => null);
+            const roleMod = await guild.roles.create({ name: 'Moderator', color: 0xffa500 }).catch(() => null);
+            const roleMember = await guild.roles.create({ name: 'Member', color: 0x00ff00 }).catch(() => null);
+            const roleMuted = await guild.roles.create({ name: 'Muted', color: 0x808080 }).catch(() => null);
+
+            // Создаём категории и каналы
+
+            // 📌 ИНФОРМАЦИЯ
+            const catInfo = await guild.channels.create({ name: '📌 ИНФОРМАЦИЯ', type: 4 });
+            await guild.channels.create({ name: '📜-правила', type: 0, parent: catInfo });
+            await guild.channels.create({ name: '📢-объявления', type: 0, parent: catInfo });
+            await guild.channels.create({ name: '🎫-тикеты', type: 0, parent: catInfo });
+
+            // 💬 ТЕКСТОВЫЕ КАНАЛЫ
+            const catText = await guild.channels.create({ name: '💬 ТЕКСТОВЫЕ КАНАЛЫ', type: 4 });
+            await guild.channels.create({ name: '👋-общение', type: 0, parent: catText });
+            await guild.channels.create({ name: '🎮-игры', type: 0, parent: catText });
+            await guild.channels.create({ name: '🎵-музыка', type: 0, parent: catText });
+            await guild.channels.create({ name: '🖼-мемы', type: 0, parent: catText });
+            await guild.channels.create({ name: '🤖-бот-команды', type: 0, parent: catText });
+
+            // 🔊 ГОЛОСОВЫЕ КАНАЛЫ
+            const catVoice = await guild.channels.create({ name: '🔊 ГОЛОСОВЫЕ КАНАЛЫ', type: 4 });
+            await guild.channels.create({ name: '🔊 Лобби', type: 2, parent: catVoice });
+            await guild.channels.create({ name: '🎮 Игры', type: 2, parent: catVoice });
+            await guild.channels.create({ name: '🎵 Музыка', type: 2, parent: catVoice });
+            await guild.channels.create({ name: '💬 Разговоры', type: 2, parent: catVoice });
+
+            // 🛡 МОДЕРАЦИЯ
+            const catMod = await guild.channels.create({ name: '🛡 МОДЕРАЦИЯ', type: 4 });
+            await guild.channels.create({ name: '📋-логи', type: 0, parent: catMod });
+            await guild.channels.create({ name: '⚡-модерация-чат', type: 0, parent: catMod });
+
+            const successEmbed = new EmbedBuilder()
+                .setColor(0x00ff00)
+                .setTitle('✅ Сервер готов!')
+                .setDescription('Создана красивая структура:')
+                .addFields(
+                    { name: '📌 Информация', value: 'Правила, Объявления, Тикеты', inline: true },
+                    { name: '💬 Текстовые', value: 'Общение, Игры, Музыка, Мемы, Бот', inline: true },
+                    { name: '🔊 Голосовые', value: 'Лобби, Игры, Музыка, Разговоры', inline: true },
+                    { name: '🛡 Модерация', value: 'Логи, Модерация чат', inline: true },
+                    { name: '🎭 Роли', value: 'Admin, Moderator, Member, Muted', inline: true }
+                )
+                .setTimestamp();
+            msg.edit({ embeds: [successEmbed] });
+        } catch (err) {
+            console.error('❌ Ошибка setup:', err);
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+        }
+    }
+});
+
 // --- ПОМОЩЬ ---
 
 commands.set('help', {
@@ -512,7 +598,7 @@ commands.set('help', {
                 { name: '🛡️ Модерация', value: '`!kick` `!ban` `!unban` `!mute` `!unmute` `!clear`' },
                 { name: '🎮 Мини-игры', value: '`!random` `!rps` `!roulette`' },
                 { name: '🎵 Музыка', value: '`!play` `!skip` `!stop` `!queue`' },
-                { name: '👋 Настройка', value: '`!welcome` `!autorole` `!help`' }
+                { name: '⚙️ Сервер', value: '`!setup` `!welcome` `!autorole` `!help`' }
             )
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
