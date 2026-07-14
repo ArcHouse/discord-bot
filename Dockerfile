@@ -6,6 +6,9 @@ RUN apt-get update && apt-get install -y \
     libopus-dev \
     python3 \
     build-essential \
+    make \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
