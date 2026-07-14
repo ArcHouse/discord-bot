@@ -128,7 +128,7 @@ async function fetchLoLYouTube() {
 
 // Twitch каналы для отслеживания
 const TWITCH_CHANNELS = [
-    { name: 'ZOHAN', login: 'zohan' } // Твой канал
+    { name: 'BubaLeggg', login: 'bubaleggg' }
 ];
 
 // Хранилище статуса стримов
