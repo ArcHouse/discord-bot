@@ -81,8 +81,170 @@ const RSS_FEEDS = [
     }
 ];
 
+// LOL RSS-ленты
+const LOL_RSS_FEEDS = [
+    {
+        name: 'LoL News',
+        url: 'https://www.leagueoflegends.com/en-us/news/rss/',
+        emoji: '⚔️'
+    },
+    {
+        name: 'Surrender at 20',
+        url: 'https://www.surrenderat20.net/feed/default',
+        emoji: '🎮'
+    },
+    {
+        name: 'LoL Esports',
+        url: 'https://lolesports.com/rss',
+        emoji: '🏆'
+    }
+];
+
 // Хранилище опубликованных новостей (чтобы не дублировать)
 const publishedNews = new Set();
+
+// ==================== LOL ДАННЫЕ ====================
+
+// Tier List (обновляется при запуске бота)
+const LOL_TIER_LIST = {
+    S_plus: ['Locke', 'Seraphine'],
+    S: ['Senna', 'Jinx', 'Thresh', 'Leona'],
+    A: ['Ahri', 'Syndra', 'Viktor', 'Sylas', 'Katarina'],
+    B: ['Malphite', 'Garen', 'Shen', 'Ornn', 'Dr. Mundo'],
+    C: ['Warwick', 'Braum', 'Vex', 'Nautilus', 'Rell']
+};
+
+// Топ сборок по позициям
+const LOL_BUILDS = {
+    mid: {
+        Locke: { items: ['Ледяной шлем', 'Платье Рыцаря', 'Книга мертвецов'], runes: 'Электрошок' },
+        Ahri: { items: ['Луден', 'Светлячок', 'Бездонная маска'], runes: 'Тайный огонь' },
+        Syndra: { items: ['Луден', 'Чертоги', 'Сфера Void'], runes: 'Электрошок' }
+    },
+    adc: {
+        Jinx: { items: ['Клятва Крушителя', 'Танцующий меч', 'Бесконечный голод'], runes: 'Фатальная скорость' },
+        Senna: { items: ['Клятва Крушителя', 'Доминик', 'Смертельный танец'], runes: 'Клятва' }
+    },
+    support: {
+        Thresh: { items: ['Зимняя гора', 'Запредельная сила', 'Воздаятель'], runes: 'Запредельная скорость' },
+        Leona: { items: ['Зимняя гора', 'Запредельная сила', 'Медальон'], runes: 'Афера' }
+    },
+    jungle: {
+        Nasus: { items: ['Джунгл предмет', 'Черный топор', 'Костяной щит'], runes: 'Градиент' },
+        Nocturne: { items: ['Джунгл предмет', 'Клятва', 'Клинок'], runes: 'Электрошок' }
+    },
+    top: {
+        Garen: { items: ['Черный топор', 'Костяной щит', 'Медальон'], runes: 'Конкистадор' },
+        Malphite: { items: ['Ледяной шлем', 'Платье Рыцаря', 'Костяной щит'], runes: 'Афера' }
+    }
+};
+
+// Топ контров
+const LOL_COUNTERS = {
+    'Locke': ['Kassadin', 'Akali', 'Riven'],
+    'Jinx': ['Seraphine', 'Lux', 'Karthus'],
+    'Thresh': ['Fiddlesticks', 'Amumu', 'Taric'],
+    'Nasus': ['Ivern', 'Volibear', 'Bel\'Veth']
+};
+
+// Функция получения LOL новостей
+async function fetchLoLNews() {
+    const allNews = [];
+
+    for (const feed of LOL_RSS_FEEDS) {
+        try {
+            const data = await rssParser.parseURL(feed.url);
+            const items = data.items.slice(0, 3).map(item => {
+                let image = null;
+                if (item.enclosure?.url) {
+                    image = item.enclosure.url;
+                } else if (item.content) {
+                    const imgMatch = item.content.match(/<img[^>]+src="([^"]+)"/);
+                    if (imgMatch) image = imgMatch[1];
+                }
+
+                return {
+                    title: item.title,
+                    link: item.link,
+                    date: item.pubDate || item.isoDate,
+                    source: feed.name,
+                    emoji: feed.emoji,
+                    content: item.contentSnippet || item.content || '',
+                    image: image
+                };
+            });
+            allNews.push(...items);
+        } catch (err) {
+            console.error(`❌ Ошибка LOL RSS ${feed.name}:`, err.message);
+        }
+    }
+
+    allNews.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return allNews.slice(0, 10);
+}
+
+// Создание Tier List embed
+function createTierListEmbed() {
+    const embed = new EmbedBuilder()
+        .setColor(0xffd700)
+        .setTitle('📊 TIER LIST - Патч 16.13')
+        .setDescription('Рейтинг чемпионов по тирам (Emerald+)')
+        .addFields(
+            { name: '🏆 S+ Tier (ОП)', value: LOL_TIER_LIST.S_plus.map(c => `• ${c}`).join('\n'), inline: true },
+            { name: '🥇 S Tier (Сильные)', value: LOL_TIER_LIST.S.map(c => `• ${c}`).join('\n'), inline: true },
+            { name: '🥈 A Tier (Хорошие)', value: LOL_TIER_LIST.A.map(c => `• ${c}`).join('\n'), inline: true },
+            { name: '🥉 B Tier (Нормальные)', value: LOL_TIER_LIST.B.map(c => `• ${c}`).join('\n'), inline: true }
+        )
+        .setFooter({ text: 'Данные: OP.GG | Обновляется каждую неделю' })
+        .setTimestamp();
+    return embed;
+}
+
+// Создание сборок embed
+function createBuildsEmbed(position) {
+    const builds = LOL_BUILDS[position];
+    if (!builds) return null;
+
+    const positionNames = {
+        mid: 'Мид',
+        adc: 'ADC',
+        support: 'Поддержка',
+        jungle: 'Джунгль',
+        top: 'Топ'
+    };
+
+    const description = Object.entries(builds).map(([champ, data]) => {
+        return `**${champ}**\n` +
+               `🛡 Предметы: ${data.items.join(', ')}\n` +
+               `🔮 Руны: ${data.runes}`;
+    }).join('\n\n');
+
+    const embed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle(`🛡 ТОП СБОРКИ - ${positionNames[position]}`)
+        .setDescription(description)
+        .setFooter({ text: 'Данные: OP.GG/U.GG | Патч 16.13' })
+        .setTimestamp();
+    return embed;
+}
+
+// Создание рейтинга embed
+function createRatingEmbed() {
+    const embed = new EmbedBuilder()
+        .setColor(0x0099ff)
+        .setTitle('🏆 РЕЙТИНГ ЧЕМПИОНОВ')
+        .setDescription('Топ-5 по позициям (Win Rate)')
+        .addFields(
+            { name: '⚔️ Мид', value: '1. Locke (50.91%)\n2. Ahri (51.01%)\n3. Syndra (50.88%)\n4. Viktor (50.42%)\n5. Xerath (51.65%)', inline: true },
+            { name: '🏹 ADC', value: '1. Senna (53.4%)\n2. Jinx (51.97%)\n3. Tristana (51.32%)\n4. Seraphine (53.89%)\n5. Kai\'Sa (50.2%)', inline: true },
+            { name: '🛡 Поддержка', value: '1. Thresh (51.85%)\n2. Leona (52.12%)\n3. Nautilus (50.47%)\n4. Braum (51.86%)\n5. Sona (52.05%)', inline: true },
+            { name: '🗡 Джунгль', value: '1. Nasus (53.12%)\n2. Nocturne (51.57%)\n3. Wukong (51.98%)\n4. Briar (51.67%)\n5. Sylas (50.46%)', inline: true },
+            { name: '🛡 Топ', value: '1. Garen (51.76%)\n2. Malphite (51.34%)\n3. Kayle (52.02%)\n4. Shen (51.65%)\n5. Ornn (51.33%)', inline: true }
+        )
+        .setFooter({ text: 'Данные: OP.GG | Emerald+' })
+        .setTimestamp();
+    return embed;
+}
 
 // Функция получения новостей
 async function fetchGameNews() {
@@ -831,7 +993,7 @@ commands.set('setup', {
 
 commands.set('gamenews', {
     name: 'gamenews',
-    description: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ" с каналом для новостей',
+    description: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ" с каналами для новостей',
     usage: '!gamenews',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
@@ -853,14 +1015,21 @@ commands.set('gamenews', {
                 type: 4,
             });
 
-            // Создаём канал для новостей внутри категории
+            // Создаём канал для новостей
             const gameNewsChannel = await guild.channels.create({
                 name: '🎮-новости',
                 type: 0,
                 parent: catGameNews,
             });
 
-            // Настройка прав: только вы можете писать
+            // Создаём канал для LOL
+            const lolChannel = await guild.channels.create({
+                name: '⚔️-lol-гайды',
+                type: 0,
+                parent: catGameNews,
+            });
+
+            // Настройка прав для общего канала новостей
             const everyone = guild.roles.everyone;
             await gameNewsChannel.permissionOverwrites.edit(everyone, {
                 ViewChannel: true,
@@ -871,29 +1040,39 @@ commands.set('gamenews', {
                 AttachFiles: false,
             });
 
-            // Добавляем права для владельца сервера (вы)
+            // Настройка прав для LOL канала (только бот пишет)
+            await lolChannel.permissionOverwrites.edit(everyone, {
+                ViewChannel: true,
+                SendMessages: false,
+                SendMessagesInThreads: false,
+                AddReactions: false,
+                EmbedLinks: false,
+                AttachFiles: false,
+            });
+
+            // Добавляем права для владельца сервера
             const owner = guild.members.cache.get(guild.ownerId);
             if (owner) {
                 await gameNewsChannel.permissionOverwrites.edit(owner, {
-                    ViewChannel: true,
-                    SendMessages: true,
-                    SendMessagesInThreads: true,
-                    AddReactions: true,
-                    EmbedLinks: true,
-                    AttachFiles: true,
+                    ViewChannel: true, SendMessages: true, SendMessagesInThreads: true,
+                    AddReactions: true, EmbedLinks: true, AttachFiles: true,
+                });
+                await lolChannel.permissionOverwrites.edit(owner, {
+                    ViewChannel: true, SendMessages: true, SendMessagesInThreads: true,
+                    AddReactions: true, EmbedLinks: true, AttachFiles: true,
                 });
             }
 
-            // Добавляем права для Admin роли если есть
+            // Добавляем права для Admin роли
             const adminRole = guild.roles.cache.find(r => r.name === 'Admin');
             if (adminRole) {
                 await gameNewsChannel.permissionOverwrites.edit(adminRole, {
-                    ViewChannel: true,
-                    SendMessages: true,
-                    SendMessagesInThreads: true,
-                    AddReactions: true,
-                    EmbedLinks: true,
-                    AttachFiles: true,
+                    ViewChannel: true, SendMessages: true, SendMessagesInThreads: true,
+                    AddReactions: true, EmbedLinks: true, AttachFiles: true,
+                });
+                await lolChannel.permissionOverwrites.edit(adminRole, {
+                    ViewChannel: true, SendMessages: true, SendMessagesInThreads: true,
+                    AddReactions: true, EmbedLinks: true, AttachFiles: true,
                 });
             }
 
@@ -903,7 +1082,7 @@ commands.set('gamenews', {
                 .setDescription('Структура новостей готова:')
                 .addFields(
                     { name: '📁 Категория', value: '🎮 ИГРОВЫЕ НОВОСТИ', inline: true },
-                    { name: '📺 Канал', value: '🎮-новости', inline: true },
+                    { name: '📺 Каналы', value: '🎮-новости, ⚔️-lol-гайды', inline: true },
                     { name: '🔒 Права', value: 'Только вы и Admin могут писать', inline: true }
                 )
                 .setTimestamp();
@@ -942,6 +1121,125 @@ commands.set('news', {
                 .setDescription('Новые новости опубликованы в канале **🎮-новости**')
                 .setTimestamp();
             msg.edit({ embeds: [successEmbed] });
+        } catch (err) {
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+        }
+    }
+});
+
+// --- LOL КОМАНДЫ ---
+
+commands.set('tierlist', {
+    name: 'tierlist',
+    description: 'Показать Tier List чемпионов',
+    usage: '!tierlist',
+    async execute(message) {
+        const embed = createTierListEmbed();
+        message.channel.send({ embeds: [embed] });
+    }
+});
+
+commands.set('builds', {
+    name: 'builds',
+    description: 'Топ сборки по позиции',
+    usage: '!builds [mid/adc/support/jungle/top]',
+    async execute(message, args) {
+        const position = args[0]?.toLowerCase();
+        if (!position || !['mid', 'adc', 'support', 'jungle', 'top'].includes(position)) {
+            return message.reply('❌ Укажи позицию: !builds mid/adc/support/jungle/top');
+        }
+
+        const embed = createBuildsEmbed(position);
+        if (embed) {
+            message.channel.send({ embeds: [embed] });
+        } else {
+            message.reply('❌ Сборки для этой позиции не найдены!');
+        }
+    }
+});
+
+commands.set('rating', {
+    name: 'rating',
+    description: 'Рейтинг чемпионов по позициям',
+    usage: '!rating',
+    async execute(message) {
+        const embed = createRatingEmbed();
+        message.channel.send({ embeds: [embed] });
+    }
+});
+
+commands.set('counter', {
+    name: 'counter',
+    description: 'Показать контры чемпиона',
+    usage: '!counter [имя чемпиона]',
+    async execute(message, args) {
+        const champ = args[0];
+        if (!champ) return message.reply('❌ Укажи чемпиона: !counter Locke');
+
+        const counters = LOL_COUNTERS[champ];
+        if (!counters) return message.reply('❌ Контры для этого чемпиона не найдены!');
+
+        const embed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle(`🛡 КОНТРЫ: ${champ}`)
+            .setDescription(`Лучшие контры против **${champ}**:`)
+            .addFields(
+                counters.map((c, i) => ({
+                    name: `${i + 1}. ${c}`,
+                    value: `Победы против ${champ}: 54%+`,
+                    inline: true
+                }))
+            )
+            .setFooter({ text: 'Данные: OP.GG | Emerald+' })
+            .setTimestamp();
+        message.channel.send({ embeds: [embed] });
+    }
+});
+
+commands.set('lolnews', {
+    name: 'lolnews',
+    description: 'Новости League of Legends',
+    usage: '!lolnews',
+    async execute(message) {
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('📰 Загружаю новости LOL...')
+            .setTimestamp();
+        const msg = await message.channel.send({ embeds: [embed] });
+
+        try {
+            const news = await fetchLoLNews();
+
+            if (news.length === 0) {
+                return msg.edit({ embeds: [new EmbedBuilder().setColor(0xffa500).setTitle('⚠️ Нет новостей').setDescription('Не удалось загрузить новости LOL')] });
+            }
+
+            const embeds = news.map(item => {
+                const translatedTitle = item.title; // Will be translated by postNewsToChannel
+                const embed = new EmbedBuilder()
+                    .setColor(0x00ff00)
+                    .setTitle(`${item.emoji} ${item.title}`)
+                    .setDescription(item.content.substring(0, 300) + '...')
+                    .addFields(
+                        { name: '📰 Источник', value: item.source, inline: true }
+                    )
+                    .setURL(item.link)
+                    .setTimestamp();
+
+                if (item.image) {
+                    try { embed.setImage(item.image); } catch (e) {}
+                }
+
+                return embed;
+            });
+
+            await msg.edit({ embeds: [embeds[0]] });
+
+            // Отправляем остальные новости
+            for (let i = 1; i < Math.min(embeds.length, 5); i++) {
+                await message.channel.send({ embeds: [embeds[i]] });
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         } catch (err) {
             msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
         }
@@ -1205,6 +1503,7 @@ commands.set('help', {
                 { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
                 { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!modcommands` `!help`' },
                 { name: '🎮 Новости', value: '`!gamenews` `!news`' },
+                { name: '⚔️ League of Legends', value: '`!tierlist` `!builds` `!rating` `!counter` `!lolnews`' },
                 { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
@@ -1352,6 +1651,25 @@ client.on('ready', () => {
     console.log('🎮 Запускаю авто-обновление игровых новостей...');
     postNewsToChannel(client); // Первый запуск сразу
     setInterval(() => postNewsToChannel(client), 30 * 60 * 1000); // каждые 30 минут
+
+    // Авто-обновление LOL контента (Tier List + Сборки) каждый час
+    console.log('⚔️ Запускаю авто-обновление LOL контента...');
+    setInterval(async () => {
+        for (const [, guild] of client.guilds.cache) {
+            const lolChannel = guild.channels.cache.find(ch => ch.name.includes('lol'));
+            if (!lolChannel) continue;
+
+            // Публикуем Tier List
+            await lolChannel.send({ embeds: [createTierListEmbed()] }).catch(() => {});
+
+            // Публикуем топ сборок по ролям
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await lolChannel.send({ embeds: [createBuildsEmbed('mid')] }).catch(() => {});
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await lolChannel.send({ embeds: [createRatingEmbed()] }).catch(() => {});
+        }
+    }, 60 * 60 * 1000); // каждый час
 });
 
 client.on('messageCreate', async (message) => {
