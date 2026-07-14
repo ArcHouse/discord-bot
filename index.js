@@ -455,8 +455,12 @@ commands.set('welcome', {
             return message.reply('❌ Только админ может настроить приветствие!');
         }
 
-        const channel = message.mentions.channels.first();
-        if (!channel) return message.reply('❌ Укажи канал: !welcome #general');
+        let channel = message.mentions.channels.first();
+        if (!channel && args[0]) {
+            const channelName = args[0].replace('#', '');
+            channel = message.guild.channels.cache.find(ch => ch.name === channelName);
+        }
+        if (!channel) return message.reply('❌ Укажи канал: !welcome #общее');
 
         process.env.WELCOME_CHANNEL = channel.name;
 
