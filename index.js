@@ -37,7 +37,7 @@ const client = new Client(clientOptions);
 const player = new Player(client);
 
 // Регистрация экстракторов для YouTube и других источников
-player.extractors.loadDefault().then(() => {
+player.extractors.loadMulti(DefaultExtractors).then(() => {
     console.log('🎵 Экстракторы музыки загружены!');
 });
 
