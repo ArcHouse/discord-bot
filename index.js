@@ -618,6 +618,94 @@ commands.set('setup', {
     }
 });
 
+// --- ИГРОВЫЕ НОВОСТИ ---
+
+commands.set('gamenews', {
+    name: 'gamenews',
+    description: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ" с каналом для новостей',
+    usage: '!gamenews',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может создавать категорию новостей!');
+        }
+
+        const guild = message.guild;
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('🎮 Создаю категорию "ИГРОВЫЕ НОВОСТИ"...')
+            .setDescription('Подожди несколько секунд...')
+            .setTimestamp();
+        const msg = await message.channel.send({ embeds: [embed] });
+
+        try {
+            // Создаём категорию "🎮 ИГРОВЫЕ НОВОСТИ"
+            const catGameNews = await guild.channels.create({
+                name: '🎮 ИГРОВЫЕ НОВОСТИ',
+                type: 4,
+            });
+
+            // Создаём канал для новостей внутри категории
+            const gameNewsChannel = await guild.channels.create({
+                name: '🎮-новости',
+                type: 0,
+                parent: catGameNews,
+            });
+
+            // Настройка прав: только вы можете писать
+            const everyone = guild.roles.everyone;
+            await gameNewsChannel.permissionOverwrites.edit(everyone, {
+                ViewChannel: true,
+                SendMessages: false,
+                SendMessagesInThreads: false,
+                AddReactions: false,
+                EmbedLinks: false,
+                AttachFiles: false,
+            });
+
+            // Добавляем права для владельца сервера (вы)
+            const owner = guild.members.cache.get(guild.ownerId);
+            if (owner) {
+                await gameNewsChannel.permissionOverwrites.edit(owner, {
+                    ViewChannel: true,
+                    SendMessages: true,
+                    SendMessagesInThreads: true,
+                    AddReactions: true,
+                    EmbedLinks: true,
+                    AttachFiles: true,
+                });
+            }
+
+            // Добавляем права для Admin роли если есть
+            const adminRole = guild.roles.cache.find(r => r.name === 'Admin');
+            if (adminRole) {
+                await gameNewsChannel.permissionOverwrites.edit(adminRole, {
+                    ViewChannel: true,
+                    SendMessages: true,
+                    SendMessagesInThreads: true,
+                    AddReactions: true,
+                    EmbedLinks: true,
+                    AttachFiles: true,
+                });
+            }
+
+            const successEmbed = new EmbedBuilder()
+                .setColor(0x00ff00)
+                .setTitle('✅ Категория "🎮 ИГРОВЫЕ НОВОСТИ" создана!')
+                .setDescription('Структура новостей готова:')
+                .addFields(
+                    { name: '📁 Категория', value: '🎮 ИГРОВЫЕ НОВОСТИ', inline: true },
+                    { name: '📺 Канал', value: '🎮-новости', inline: true },
+                    { name: '🔒 Права', value: 'Только вы и Admin могут писать', inline: true }
+                )
+                .setTimestamp();
+            msg.edit({ embeds: [successEmbed] });
+        } catch (err) {
+            console.error('❌ Ошибка gamenews:', err);
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+        }
+    }
+});
+
 // --- ВЕРИФИКАЦИЯ ---
 
 commands.set('verify', {
@@ -776,6 +864,7 @@ commands.set('modcommands', {
                 { name: '`!giveaway время | приз | описание`', value: 'Розыгрыш (секунды)', inline: false },
                 { name: '`!commands #канал`', value: 'Публичные команды', inline: true },
                 { name: '`!modcommands #канал`', value: 'Этот список', inline: true },
+                { name: '`!gamenews`', value: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ"', inline: true },
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ АВТОМАТИЧЕСКИ**', inline: false },
                 { name: 'Логирование', value: 'Удаление/редактирование в #📋-логи', inline: true },
                 { name: 'Прощание', value: 'Сообщение когда кто-то вышел', inline: true }
@@ -872,6 +961,7 @@ commands.set('help', {
                 { name: '📊 Опросы', value: '`!poll`' },
                 { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
                 { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!modcommands` `!help`' },
+                { name: '🎮 Новости', value: '`!gamenews`' },
                 { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
