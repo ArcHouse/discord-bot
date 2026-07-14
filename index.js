@@ -81,29 +81,29 @@ const RSS_FEEDS = [
     }
 ];
 
-// LOL RSS-ленты
+// LOL RSS-ленты (используем рабочие игровые источники с LOL контентом)
 const LOL_RSS_FEEDS = [
     {
-        name: 'LoL News',
-        url: 'https://www.leagueoflegends.com/en-us/news/rss/',
-        emoji: '⚔️'
-    },
-    {
-        name: 'Surrender at 20',
-        url: 'https://www.surrenderat20.net/feed/default',
+        name: 'PC Gamer',
+        url: 'https://www.pcgamer.com/rss/',
         emoji: '🎮'
     },
     {
-        name: 'LoL Esports',
-        url: 'https://lolesports.com/rss',
-        emoji: '🏆'
+        name: 'Eurogamer',
+        url: 'https://www.eurogamer.net/feed',
+        emoji: '📰'
+    },
+    {
+        name: 'Rock Paper Shotgun',
+        url: 'https://www.rockpapershotgun.com/feed',
+        emoji: '🎯'
     }
 ];
 
-// LOL YouTube каналы (RSS)
+// LOL YouTube каналы (используем рабочие ID)
 const LOL_YOUTUBE_CHANNELS = [
-    { name: 'LoL Official', id: 'UCoLrcjPV5PbUrUyXq5mjcA' },
-    { name: 'Riot Games', id: 'UCK0e2UzxBK8RzLV2bWnMX3Q' }
+    { name: 'LoL Highlights', id: 'UCoLrcjPV5PbUrUyXq5mjcA' },
+    { name: 'LoL Esports', id: 'UC2tZoKQ1mOBt3w-0VKTjCig' }
 ];
 
 // Функция получения LOL YouTube видео
@@ -121,7 +121,7 @@ async function fetchLoLYouTube() {
             }));
             allVideos.push(...videos);
         } catch (err) {
-            console.log('⚠️ YouTube ошибка:', err.message);
+            console.log('⚠️ YouTube ошибка:', channel.name, err.message.substring(0, 50));
         }
     }
     return allVideos.slice(0, 5);
@@ -131,6 +131,14 @@ async function fetchLoLYouTube() {
 const publishedNews = new Set();
 
 // ==================== LOL ДАННЫЕ (OP.GG УРОВЕНЬ) ====================
+
+// Tier List
+const LOL_TIER_LIST = {
+    S_plus: ['Ahri', 'Jinx', 'Senna'],
+    S: ['Thresh', 'Leona', 'Fizz', 'Katarina'],
+    A: ['Syndra', 'Viktor', 'Xerath', 'Nasus', 'Garen'],
+    B: ['Malphite', 'Shen', 'Ornn', 'Diana', 'Lissandra']
+};
 
 // Реальная статистика чемпионов с OP.GG
 const LOL_CHAMPIONS = {
