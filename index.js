@@ -52,32 +52,32 @@ player.extractors.loadMulti(DefaultExtractors).then(() => {
 
 const rssParser = new RSSParser();
 
-// RSS-ленты игровых новостей
+// RSS-ленты игровых новостей (только рабочие!)
 const RSS_FEEDS = [
-    {
-        name: 'IGN',
-        url: 'https://feeds.feedburner.com/ign/all',
-        emoji: '🔥'
-    },
-    {
-        name: 'GameSpot',
-        url: 'https://www.gamespot.com/feeds/mars_news/',
-        emoji: '🎮'
-    },
     {
         name: 'PC Gamer',
         url: 'https://www.pcgamer.com/rss/',
         emoji: '🖥️'
     },
     {
-        name: 'Kotaku',
-        url: 'https://kotaku.com/rss',
+        name: 'Eurogamer',
+        url: 'https://www.eurogamer.net/feed',
+        emoji: '🎮'
+    },
+    {
+        name: 'Rock Paper Shotgun',
+        url: 'https://www.rockpapershotgun.com/feed',
         emoji: '📰'
     },
     {
-        name: 'Polygon',
-        url: 'https://www.polygon.com/rss/index.xml',
+        name: 'VG247',
+        url: 'https://www.vg247.com/feed',
         emoji: '🎯'
+    },
+    {
+        name: 'GamesIndustry',
+        url: 'https://www.gamesindustry.biz/feed',
+        emoji: '📊'
     }
 ];
 
@@ -126,11 +126,15 @@ async function postNewsToChannel(client) {
                 const newsId = `${item.source}-${item.title}`;
                 if (publishedNews.has(newsId)) continue;
 
+                // Переводим заголовок и описание на русский
+                const translatedTitle = await translateToRussian(item.title);
+                const translatedContent = await translateToRussian(item.content);
+
                 // Публикуем новость
                 const embed = new EmbedBuilder()
                     .setColor(getColorBySource(item.source))
-                    .setTitle(`${item.emoji} ${item.title}`)
-                    .setDescription(item.content.substring(0, 500) + (item.content.length > 500 ? '...' : ''))
+                    .setTitle(`${item.emoji} ${translatedTitle}`)
+                    .setDescription(translatedContent.substring(0, 500) + (translatedContent.length > 500 ? '...' : ''))
                     .addFields(
                         { name: '📰 Источник', value: item.source, inline: true },
                         { name: '🕐 Дата', value: formatDate(item.date), inline: true }
@@ -155,11 +159,11 @@ async function postNewsToChannel(client) {
 // Цвета по источникам
 function getColorBySource(source) {
     const colors = {
-        'IGN': 0xff0000,
-        'GameSpot': 0x00ff00,
         'PC Gamer': 0x0099ff,
-        'Kotaku': 0xff6600,
-        'Polygon': 0x9933ff
+        'Eurogamer': 0xff6600,
+        'Rock Paper Shotgun': 0xffcc00,
+        'VG247': 0x9933ff,
+        'GamesIndustry': 0x00ff00
     };
     return colors[source] || 0x5865f2;
 }
@@ -178,6 +182,34 @@ function formatDate(dateStr) {
     } catch {
         return 'Недавно';
     }
+}
+
+// Перевод текста на русский (через бесплатный API)
+async function translateToRussian(text) {
+    if (!text || text.length < 10) return text;
+
+    try {
+        // Используем LibreTranslate API (бесплатный)
+        const response = await fetch('https://libretranslate.de/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                q: text.substring(0, 500), // Ограничиваем длину
+                source: 'en',
+                target: 'ru'
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            return data.translatedText || text;
+        }
+    } catch (err) {
+        console.error('⚠️ Ошибка перевода:', err.message);
+    }
+
+    // Fallback: возвращаем оригинальный текст
+    return text;
 }
 
 // Логирование событий плеера
