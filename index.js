@@ -91,14 +91,35 @@ async function fetchGameNews() {
     for (const feed of RSS_FEEDS) {
         try {
             const data = await rssParser.parseURL(feed.url);
-            const items = data.items.slice(0, 5).map(item => ({
-                title: item.title,
-                link: item.link,
-                date: item.pubDate || item.isoDate,
-                source: feed.name,
-                emoji: feed.emoji,
-                content: item.contentSnippet || item.content || ''
-            }));
+            const items = data.items.slice(0, 5).map(item => {
+                // Извлекаем картинку из новости
+                let image = null;
+
+                // Проверяем разные источники картинок в RSS
+                if (item.enclosure?.url) {
+                    image = item.enclosure.url;
+                } else if (item['media:thumbnail']?.$?.url) {
+                    image = item['media:thumbnail'].$.url;
+                } else if (item['media:content']?.$?.url) {
+                    image = item['media:content'].$.url;
+                } else if (item.content) {
+                    // Пробуем извлечь картинку из HTML контента
+                    const imgMatch = item.content.match(/<img[^>]+src="([^"]+)"/);
+                    if (imgMatch) {
+                        image = imgMatch[1];
+                    }
+                }
+
+                return {
+                    title: item.title,
+                    link: item.link,
+                    date: item.pubDate || item.isoDate,
+                    source: feed.name,
+                    emoji: feed.emoji,
+                    content: item.contentSnippet || item.content || '',
+                    image: image
+                };
+            });
             allNews.push(...items);
         } catch (err) {
             console.error(`❌ Ошибка RSS ${feed.name}:`, err.message);
@@ -152,6 +173,15 @@ async function postNewsToChannel(client) {
                     )
                     .setURL(item.link)
                     .setTimestamp();
+
+                // Добавляем картинку если есть
+                if (item.image) {
+                    try {
+                        embed.setImage(item.image);
+                    } catch (err) {
+                        // Картинка может быть недоступна - просто пропускаем
+                    }
+                }
 
                 await newsChannel.send({ embeds: [embed] }).catch(err => {
                     console.error('❌ Ошибка отправки:', err.message);
