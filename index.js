@@ -41,6 +41,24 @@ player.extractors.loadMulti(DefaultExtractors).then(() => {
     console.log('🎵 Экстракторы музыки загружены!');
 });
 
+// Логирование событий плеера
+player.events.on('playerStart', (queue, track) => {
+    console.log(`🎵 Воспроизведение: ${track.title}`);
+});
+
+player.events.on('playerError', (queue, error, track) => {
+    console.error(`❌ Ошибка плеера: ${error.message}`);
+    console.error(error.stack);
+});
+
+player.events.on('error', (queue, error) => {
+    console.error(`❌ Ошибка очереди: ${error.message}`);
+});
+
+player.events.on('connectionError', (queue, error) => {
+    console.error(`❌ Ошибка подключения: ${error.message}`);
+});
+
 // ==================== КОМАНДЫ ====================
 
 const commands = new Map();
