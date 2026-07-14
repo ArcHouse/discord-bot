@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityTy
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const { Player } = require('discord-player');
 const { extractors, DefaultExtractors } = require('@discord-player/extractor');
+const RSSParser = require('rss-parser');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -46,6 +47,138 @@ const player = new Player(client);
 player.extractors.loadMulti(DefaultExtractors).then(() => {
     console.log('🎵 Экстракторы музыки загружены!');
 });
+
+// ==================== ИГРОВЫЕ НОВОСТИ ====================
+
+const rssParser = new RSSParser();
+
+// RSS-ленты игровых новостей
+const RSS_FEEDS = [
+    {
+        name: 'IGN',
+        url: 'https://feeds.feedburner.com/ign/all',
+        emoji: '🔥'
+    },
+    {
+        name: 'GameSpot',
+        url: 'https://www.gamespot.com/feeds/mars_news/',
+        emoji: '🎮'
+    },
+    {
+        name: 'PC Gamer',
+        url: 'https://www.pcgamer.com/rss/',
+        emoji: '🖥️'
+    },
+    {
+        name: 'Kotaku',
+        url: 'https://kotaku.com/rss',
+        emoji: '📰'
+    },
+    {
+        name: 'Polygon',
+        url: 'https://www.polygon.com/rss/index.xml',
+        emoji: '🎯'
+    }
+];
+
+// Хранилище опубликованных новостей (чтобы не дублировать)
+const publishedNews = new Set();
+
+// Функция получения новостей
+async function fetchGameNews() {
+    const allNews = [];
+
+    for (const feed of RSS_FEEDS) {
+        try {
+            const data = await rssParser.parseURL(feed.url);
+            const items = data.items.slice(0, 5).map(item => ({
+                title: item.title,
+                link: item.link,
+                date: item.pubDate || item.isoDate,
+                source: feed.name,
+                emoji: feed.emoji,
+                content: item.contentSnippet || item.content || ''
+            }));
+            allNews.push(...items);
+        } catch (err) {
+            console.error(`❌ Ошибка RSS ${feed.name}:`, err.message);
+        }
+    }
+
+    // Сортируем по дате (новые сверху)
+    allNews.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    return allNews.slice(0, 20); // Топ 20 новостей
+}
+
+// Функция публикации новости в канал
+async function postNewsToChannel(client) {
+    try {
+        // Ищем канал "🎮-новости" на всех серверах
+        for (const [, guild] of client.guilds.cache) {
+            const newsChannel = guild.channels.cache.find(ch => ch.name === '🎮-новости');
+            if (!newsChannel) continue;
+
+            const news = await fetchGameNews();
+
+            for (const item of news) {
+                // Проверяем, не публиковали ли уже эту новость
+                const newsId = `${item.source}-${item.title}`;
+                if (publishedNews.has(newsId)) continue;
+
+                // Публикуем новость
+                const embed = new EmbedBuilder()
+                    .setColor(getColorBySource(item.source))
+                    .setTitle(`${item.emoji} ${item.title}`)
+                    .setDescription(item.content.substring(0, 500) + (item.content.length > 500 ? '...' : ''))
+                    .addFields(
+                        { name: '📰 Источник', value: item.source, inline: true },
+                        { name: '🕐 Дата', value: formatDate(item.date), inline: true }
+                    )
+                    .setURL(item.link)
+                    .setTimestamp();
+
+                await newsChannel.send({ embeds: [embed] }).catch(() => {});
+
+                // Добавляем в опубликованные
+                publishedNews.add(newsId);
+
+                // Задержка между сообщениями (чтобы не спамить)
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
+    } catch (err) {
+        console.error('❌ Ошибка публикации новостей:', err);
+    }
+}
+
+// Цвета по источникам
+function getColorBySource(source) {
+    const colors = {
+        'IGN': 0xff0000,
+        'GameSpot': 0x00ff00,
+        'PC Gamer': 0x0099ff,
+        'Kotaku': 0xff6600,
+        'Polygon': 0x9933ff
+    };
+    return colors[source] || 0x5865f2;
+}
+
+// Форматирование даты
+function formatDate(dateStr) {
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch {
+        return 'Недавно';
+    }
+}
 
 // Логирование событий плеера
 player.events.on('playerStart', (queue, track) => {
@@ -706,6 +839,39 @@ commands.set('gamenews', {
     }
 });
 
+// --- ОБНОВИТЬ НОВОСТИ ---
+
+commands.set('news', {
+    name: 'news',
+    description: 'Обновить игровые новости вручную',
+    usage: '!news',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ может обновлять новости!');
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('🎮 Обновляю игровые новости...')
+            .setDescription('Подожди несколько секунд...')
+            .setTimestamp();
+        const msg = await message.channel.send({ embeds: [embed] });
+
+        try {
+            await postNewsToChannel(message.client);
+
+            const successEmbed = new EmbedBuilder()
+                .setColor(0x00ff00)
+                .setTitle('✅ Новости обновлены!')
+                .setDescription('Новые новости опубликованы в канале **🎮-новости**')
+                .setTimestamp();
+            msg.edit({ embeds: [successEmbed] });
+        } catch (err) {
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+        }
+    }
+});
+
 // --- ВЕРИФИКАЦИЯ ---
 
 commands.set('verify', {
@@ -865,6 +1031,7 @@ commands.set('modcommands', {
                 { name: '`!commands #канал`', value: 'Публичные команды', inline: true },
                 { name: '`!modcommands #канал`', value: 'Этот список', inline: true },
                 { name: '`!gamenews`', value: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ"', inline: true },
+                { name: '`!news`', value: 'Обновить новости вручную', inline: true },
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ АВТОМАТИЧЕСКИ**', inline: false },
                 { name: 'Логирование', value: 'Удаление/редактирование в #📋-логи', inline: true },
                 { name: 'Прощание', value: 'Сообщение когда кто-то вышел', inline: true }
@@ -961,7 +1128,7 @@ commands.set('help', {
                 { name: '📊 Опросы', value: '`!poll`' },
                 { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
                 { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!modcommands` `!help`' },
-                { name: '🎮 Новости', value: '`!gamenews`' },
+                { name: '🎮 Новости', value: '`!gamenews` `!news`' },
                 { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
@@ -1104,6 +1271,11 @@ commands.set('poll', {
 client.on('ready', () => {
     console.log(`✅ Бот ${client.user.tag} запущен!`);
     client.user.setActivity('!help | Играю в игры', { type: ActivityType.Playing });
+
+    // Запускаем авто-обновление игровых новостей каждые 30 минут
+    console.log('🎮 Запускаю авто-обновление игровых новостей...');
+    postNewsToChannel(client); // Первый запуск сразу
+    setInterval(() => postNewsToChannel(client), 30 * 60 * 1000); // каждые 30 минут
 });
 
 client.on('messageCreate', async (message) => {
