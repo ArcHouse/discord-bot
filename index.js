@@ -1221,108 +1221,52 @@ commands.set('gamenews', {
 
 commands.set('postwelcome', {
     name: 'postwelcome',
-    description: 'Отправить приветственные сообщения во все каналы новостей',
+    description: 'Отправить приветственные сообщения',
     usage: '!postwelcome',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может!');
+            return message.reply('❌ Только админ!');
         }
 
         const guild = message.guild;
-        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📢 Отправляю приветствия...').setTimestamp()] });
+        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📢 Отправляю...').setTimestamp()] });
 
-        try {
-            // Находим каналы по разным способам
-            const allChannels = guild.channels.cache.filter(ch => ch.type === 0); // Text channels
+        // Получаем ВСЕ текстовые каналы
+        const channels = guild.channels.cache.filter(ch => ch.type === 0);
+        
+        let sent = 0;
 
-            let sent = 0;
-
-            for (const [, channel] of allChannels) {
-                const name = channel.name.toLowerCase();
-
-                // Канал общих новостей
-                if (name.includes('novosti') || name.includes('новости')) {
-                    if (!name.includes('lol')) {
-                        await channel.send({ embeds: [
-                            new EmbedBuilder()
-                                .setColor(0x5865f2)
-                                .setTitle('📰 ИГРОВЫЕ НОВОСТИ')
-                                .setDescription('Последние новости из мира игр!')
-                                .addFields(
-                                    { name: '📰 Что здесь есть?', value: '• GTA, Cyberpunk, Call of Duty, все игры\n• Перевод на русский язык\n• Картинки к новостям' },
-                                    { name: '⏰ Авто-обновление', value: 'Каждые 4 часа (10:00, 14:00, 18:00, 22:00)' }
-                                )
-                                .setTimestamp()
-                        ]});
-                        sent++;
-                        console.log('✅', channel.name);
-                    }
-                }
-
-                // Канал LOL новостей
-                if (name.includes('lol') && name.includes('novosti') || name.includes('lol') && name.includes('новости')) {
-                    await channel.send({ embeds: [
-                        new EmbedBuilder()
-                            .setColor(0xffd700)
-                            .setTitle('🎮 LOL НОВОСТИ')
-                            .setDescription('Последние новости League of Legends!')
-                            .addFields(
-                                { name: '📰 Что здесь есть?', value: '• Патч-ноуты\n• Новые чемпионы и скины\n• Турнирные новости' },
-                                { name: '⏰ Авто-обновление', value: 'Новости появляются автоматически' }
-                            )
-                            .setTimestamp()
-                    ]});
+        for (const [, channel] of channels) {
+            try {
+                // Проверяем название канала
+                const name = channel.name;
+                
+                if (name.includes('игровые') && name.includes('новости')) {
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('GTA, Cyberpunk, Call of Duty и другие игры!\nАвто-обновление каждые 4 часа.').setTimestamp()] });
                     sent++;
-                    console.log('✅', channel.name);
                 }
-
-                // Канал LOL гайдов
-                if (name.includes('lol') && name.includes('gajdy') || name.includes('lol') && name.includes('гайды')) {
-                    await channel.send({ embeds: [
-                        new EmbedBuilder()
-                            .setColor(0xffd700)
-                            .setTitle('⚔️ LOL ГАЙДЫ И СТАТИСТИКА')
-                            .setDescription('Tier List, сборки, рейтинги!')
-                            .addFields(
-                                { name: '💬 Где писать команды?', value: 'В канале **💬-lol-команды**!' }
-                            )
-                            .setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png')
-                            .setTimestamp()
-                    ]});
+                
+                if (name.includes('lol') && name.includes('новости')) {
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Патч-ноуты, скины, турниры!\nАвто-обновление.').setTimestamp()] });
+                    sent++;
+                }
+                
+                if (name.includes('lol') && name.includes('гайды')) {
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ').setDescription('Tier List, сборки, рейтинги!\nПишите команды в 💬-lol-команды').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
                     await channel.send({ embeds: [createTierListEmbed()] });
                     sent++;
-                    console.log('✅', channel.name);
                 }
-
-                // Канал LOL команд
-                if (name.includes('lol') && name.includes('komandy') || name.includes('lol') && name.includes('команды')) {
-                    await channel.send({ embeds: [
-                        new EmbedBuilder()
-                            .setColor(0x00ff00)
-                            .setTitle('💬 LOL КОМАНДЫ')
-                            .setDescription('Пишите команды здесь!')
-                            .addFields(
-                                { name: '📜 Команды', value: '`!tierlist` `!top mid` `!builds mid` `!rating` `!counter Ahri` `!lolnews` `!lolhelp`' },
-                                { name: '💡 Примеры', value: '`!tierlist` - Tier List\n`!top mid` - Топ чемпионов\n`!builds adc` - Сборки' }
-                            )
-                            .setTimestamp()
-                    ]});
+                
+                if (name.includes('lol') && name.includes('команды')) {
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь!\n\n!tierlist - Tier List\n!top mid - Топ чемпионов\n!builds mid - Сборки\n!rating - Рейтинг\n!counter Ahri - Статистика\n!lolnews - Новости').setTimestamp()] });
                     sent++;
-                    console.log('✅', channel.name);
                 }
+            } catch (err) {
+                console.log('❌ Ошибка в канале', channel.name, err.message);
             }
-
-            await msg.edit({ embeds: [
-                new EmbedBuilder()
-                    .setColor(0x00ff00)
-                    .setTitle(`✅ Отправлено в ${sent} каналов!`)
-                    .setTimestamp()
-            ]});
-
-        } catch (err) {
-            console.error('❌ Ошибка postwelcome:', err);
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
         }
+
+        await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle(`✅ Готово! Отправлено в ${sent} каналов`).setTimestamp()] });
     }
 });
 
