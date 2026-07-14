@@ -151,7 +151,7 @@ const LOL_CHAMPIONS = {
     ]
 };
 
-// Картинки чемпионов (OP.GG CDN)
+// Картинки чемпионов (Riot Data Dragon - работает!)
 function getChampionImage(championName) {
     const champId = {
         'Ahri': 'Ahri', 'Syndra': 'Syndra', 'Viktor': 'Viktor', 'Xerath': 'Xerath',
@@ -162,7 +162,7 @@ function getChampionImage(championName) {
         'Garen': 'Garen', 'Malphite': 'Malphite', 'Kayle': 'Kayle', 'Shen': 'Shen', 'Ornn': 'Ornn'
     };
     const id = champId[championName] || championName;
-    return `https://opgg-static.akamaized.net/meta/images/lol/20240418151623/${id}.png`;
+    return `https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/${id}.png`;
 }
 
 // ТIER EMOJI
@@ -183,7 +183,7 @@ function createTierListEmbed() {
         .setColor(0xffd700)
         .setTitle('📊 TIER LIST — Патч 16.13')
         .setDescription('**Рейтинг чемпионов по тирам** (Emerald+)\n\nДанные: OP.GG | 38.6M анализов')
-        .setImage('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
+        .setImage('https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/Ahri.png')
         .setFooter({ text: 'Обновляется каждую неделю | Данные: OP.GG' })
         .setTimestamp();
 
@@ -1205,7 +1205,7 @@ commands.set('postwelcome', {
                         { name: '🏆 Рейтинг', value: 'Топ-5 чемпионов по Win Rate', inline: true },
                         { name: '💬 Где писать команды?', value: 'В канале **💬-lol-команды**!', inline: false }
                     )
-                    .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
+                    .setThumbnail('https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/Ahri.png')
                     .setFooter({ text: 'Данные: OP.GG | Обновляется автоматически' })
                     .setTimestamp();
                 await lolGuidesChannel.send({ embeds: [lolGuidesEmbed] });
@@ -1447,7 +1447,7 @@ commands.set('lolhelp', {
                 { name: 'Сборки', value: 'Каждые 8 часов (10:00, 18:00)', inline: true },
                 { name: 'Рейтинг', value: 'Каждые 12 часов (00:00, 12:00)', inline: true }
             )
-            .setThumbnail('https://opgg-static.akamaized.net/meta/images/lol/20240418151623.db2a0c950e384c4eb4fb6dc3e2a89c5f.png')
+            .setThumbnail('https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/Ahri.png')
             .setFooter({ text: 'Данные: OP.GG | Все данные на русском языке' })
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
