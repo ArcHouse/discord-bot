@@ -198,7 +198,7 @@ function createTierListEmbed() {
     return embed;
 }
 
-// Создание embed для ТОП по позициям (С КРУПНЫМИ КАРТИНКАМИ)
+// Создание embed для ТОП по позициям (С КАРТИНКАМИ)
 function createTopChampionsEmbed(position) {
     const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
     const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
@@ -206,7 +206,6 @@ function createTopChampionsEmbed(position) {
 
     if (!champions) return null;
 
-    // Создаём отдельные embed для каждого чемпиона с его картинкой
     const embeds = [];
 
     // Главный embed
@@ -218,7 +217,7 @@ function createTopChampionsEmbed(position) {
         .setTimestamp();
     embeds.push(mainEmbed);
 
-    // Каждый чемпион отдельным embed с картинкой
+    // Каждый чемпион отдельным embed
     for (let i = 0; i < Math.min(champions.length, 5); i++) {
         const champ = champions[i];
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
@@ -231,15 +230,14 @@ function createTopChampionsEmbed(position) {
                 { name: '🔮 Руна', value: champ.rune, inline: true },
                 { name: '🛡 Сборка', value: champ.items.join(' → '), inline: false }
             )
-            .setImage(getChampionImage(champ.name))
-            .setThumbnail(getChampionImage(champ.name));
+            .setThumbnail(getChampionImage(champ.name)); // Маленькая картинка справа
         embeds.push(champEmbed);
     }
 
     return embeds;
 }
 
-// Создание сборок embed (КРАСИВО С КАРТИНКАМИ)
+// Создание сборок embed (С КАРТИНКАМИ)
 function createBuildsEmbed(position) {
     const champions = LOL_CHAMPIONS[position];
     if (!champions) return null;
@@ -258,7 +256,7 @@ function createBuildsEmbed(position) {
         .setTimestamp();
     embeds.push(mainEmbed);
 
-    // Каждая сборка отдельным embed с картинкой
+    // Каждая сборка отдельным embed
     for (let i = 0; i < Math.min(champions.length, 3); i++) {
         const champ = champions[i];
         const buildEmbed = new EmbedBuilder()
@@ -269,8 +267,7 @@ function createBuildsEmbed(position) {
                 { name: '🔮 Руна', value: champ.rune, inline: true },
                 { name: '🛡 Предметы', value: champ.items.join(' → '), inline: false }
             )
-            .setImage(getChampionImage(champ.name))
-            .setThumbnail(getChampionImage(champ.name));
+            .setThumbnail(getChampionImage(champ.name)); // Маленькая картинка справа
         embeds.push(buildEmbed);
     }
 
