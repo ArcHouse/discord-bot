@@ -198,7 +198,7 @@ function createTierListEmbed() {
     return embed;
 }
 
-// Создание embed для ТОП по позициям (С КАРТИНКАМИ)
+// Создание embed для ТОП по позициям (С КРУПНЫМИ КАРТИНКАМИ)
 function createTopChampionsEmbed(position) {
     const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
     const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
@@ -206,26 +206,37 @@ function createTopChampionsEmbed(position) {
 
     if (!champions) return null;
 
-    const embed = new EmbedBuilder()
+    // Создаём отдельные embed для каждого чемпиона с его картинкой
+    const embeds = [];
+
+    // Главный embed
+    const mainEmbed = new EmbedBuilder()
         .setColor(0xffd700)
         .setTitle(`${positionEmojis[position]} ТОП ЧЕМПИОНОВ — ${positionNames[position]}`)
         .setDescription('**Лучшие чемпионы по Win Rate** (Emerald+)')
-        .setImage(getChampionImage(champions[0].name))
         .setFooter({ text: 'Данные: OP.GG | Патч 16.13' })
         .setTimestamp();
+    embeds.push(mainEmbed);
 
-    // Добавляем каждого чемпиона с картинкой
+    // Каждый чемпион отдельным embed с картинкой
     for (let i = 0; i < Math.min(champions.length, 5); i++) {
         const champ = champions[i];
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-        embed.addFields({
-            name: `${medal} ${champ.name} (${champ.tier})`,
-            value: `**WR:** ${champ.winRate} | **PR:** ${champ.pickRate} | **BR:** ${champ.banRate}\n🔮 Руна: ${champ.rune}\n🛡 Сборка: ${champ.items.join(' → ')}`,
-            inline: false
-        });
+
+        const champEmbed = new EmbedBuilder()
+            .setColor(getTierColor(champ.tier))
+            .setTitle(`${medal} ${champ.name} — ${champ.tier} Tier`)
+            .setDescription(`**Win Rate:** ${champ.winRate} | **Pick Rate:** ${champ.pickRate} | **Ban Rate:** ${champ.banRate}`)
+            .addFields(
+                { name: '🔮 Руна', value: champ.rune, inline: true },
+                { name: '🛡 Сборка', value: champ.items.join(' → '), inline: false }
+            )
+            .setImage(getChampionImage(champ.name))
+            .setThumbnail(getChampionImage(champ.name));
+        embeds.push(champEmbed);
     }
 
-    return embed;
+    return embeds;
 }
 
 // Создание сборок embed (КРАСИВО С КАРТИНКАМИ)
@@ -236,24 +247,34 @@ function createBuildsEmbed(position) {
     const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
     const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
 
-    const embed = new EmbedBuilder()
+    const embeds = [];
+
+    // Главный embed
+    const mainEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle(`${positionEmojis[position]} ТОП СБОРКИ — ${positionNames[position]}`)
         .setDescription('**Лучшие сборки по Win Rate** (Emerald+)')
-        .setImage(getChampionImage(champions[0].name))
         .setFooter({ text: 'Данные: OP.GG/U.GG | Патч 16.13' })
         .setTimestamp();
+    embeds.push(mainEmbed);
 
+    // Каждая сборка отдельным embed с картинкой
     for (let i = 0; i < Math.min(champions.length, 3); i++) {
         const champ = champions[i];
-        embed.addFields({
-            name: `${getTierEmoji(champ.tier)} ${champ.name}`,
-            value: `**Винрейт:** ${champ.winRate} | **Тир:** ${champ.tier}\n\n🔮 **Руна:** ${champ.rune}\n🛡 **Предметы:** ${champ.items.join(' → ')}`,
-            inline: true
-        });
+        const buildEmbed = new EmbedBuilder()
+            .setColor(getTierColor(champ.tier))
+            .setTitle(`${getTierEmoji(champ.tier)} ${champ.name} — ${champ.tier} Tier`)
+            .setDescription(`**Win Rate:** ${champ.winRate}`)
+            .addFields(
+                { name: '🔮 Руна', value: champ.rune, inline: true },
+                { name: '🛡 Предметы', value: champ.items.join(' → '), inline: false }
+            )
+            .setImage(getChampionImage(champ.name))
+            .setThumbnail(getChampionImage(champ.name));
+        embeds.push(buildEmbed);
     }
 
-    return embed;
+    return embeds;
 }
 
 // Создание рейтинга embed (КРАСИВО)
@@ -1303,9 +1324,13 @@ commands.set('top', {
             return message.reply('❌ Укажи линию: `!top mid` `!top adc` `!top support` `!top jungle` `!top top`');
         }
 
-        const embed = createTopChampionsEmbed(position);
-        if (embed) {
-            message.channel.send({ embeds: [embed] });
+        const embeds = createTopChampionsEmbed(position);
+        if (embeds && embeds.length > 0) {
+            // Discord позволяет отправить до 10 embed за раз
+            for (let i = 0; i < embeds.length; i += 10) {
+                await message.channel.send({ embeds: embeds.slice(i, i + 10) });
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
         }
     }
 });
@@ -1320,9 +1345,12 @@ commands.set('builds', {
             return message.reply('❌ Укажи позицию: `!builds mid` `!builds adc` `!builds support` `!builds jungle` `!builds top`');
         }
 
-        const embed = createBuildsEmbed(position);
-        if (embed) {
-            message.channel.send({ embeds: [embed] });
+        const embeds = createBuildsEmbed(position);
+        if (embeds && embeds.length > 0) {
+            for (let i = 0; i < embeds.length; i += 10) {
+                await message.channel.send({ embeds: embeds.slice(i, i + 10) });
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
         }
     }
 });
