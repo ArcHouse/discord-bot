@@ -1105,7 +1105,7 @@ commands.set('setup', {
 
 commands.set('gamenews', {
     name: 'gamenews',
-    description: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ" с каналами',
+    description: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ"',
     usage: '!gamenews',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
@@ -1116,51 +1116,45 @@ commands.set('gamenews', {
         const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('🎮 Создаю каналы...').setTimestamp()] });
 
         try {
-            // 1. Категория
             const category = await guild.channels.create({ name: '🎮 ИГРОВЫЕ НОВОСТИ', type: 4 });
-
-            // 2. Создаём каналы по очереди с задержкой
-            const ch1 = await guild.channels.create({ name: '📰-igrovye-novosti', type: 0, parent: category });
             await new Promise(r => setTimeout(r, 1000));
 
-            const ch2 = await guild.channels.create({ name: '🎮-lol-novosti', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 1000));
+            const ch1 = await guild.channels.create({ name: '📰-игровые-новости', type: 0, parent: category });
+            await new Promise(r => setTimeout(r, 500));
+            const ch2 = await guild.channels.create({ name: '🎮-lol-новости', type: 0, parent: category });
+            await new Promise(r => setTimeout(r, 500));
+            const ch3 = await guild.channels.create({ name: '⚔️-lol-гайды', type: 0, parent: category });
+            await new Promise(r => setTimeout(r, 500));
+            const ch4 = await guild.channels.create({ name: '💬-lol-команды', type: 0, parent: category });
 
-            const ch3 = await guild.channels.create({ name: '⚔️-lol-gajdy', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 1000));
-
-            const ch4 = await guild.channels.create({ name: '💬-lol-komandy', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 1000));
-
-            // 3. Права
             const everyone = guild.roles.everyone;
+            const owner = await guild.members.fetch(guild.ownerId).catch(() => null);
+            const adminRole = guild.roles.cache.find(r => r.name === 'Admin');
+            const modRole = guild.roles.cache.find(r => r.name === 'Moderator');
 
-            // Каналы автопостинга - никто не пишет
+            // Каналы автопостинга - никто не пишет кроме.owner и Admin
             for (const ch of [ch1, ch2, ch3]) {
                 await ch.permissionOverwrites.edit(everyone, { SendMessages: false });
+                if (owner) await ch.permissionOverwrites.edit(owner, { SendMessages: true });
+                if (adminRole) await ch.permissionOverwrites.edit(adminRole, { SendMessages: true });
             }
 
-            // Канал команд - все пишут
-            await ch4.permissionOverwrites.edit(everyone, { SendMessages: true });
-
-            // Владелец везде пишет
-            const owner = await guild.members.fetch(guild.ownerId).catch(() => null);
-            if (owner) {
-                for (const ch of [ch1, ch2, ch3, ch4]) {
-                    await ch.permissionOverwrites.edit(owner, { SendMessages: true });
-                }
-            }
+            // Канал команд - пишет только.owner, Admin, Moderator
+            await ch4.permissionOverwrites.edit(everyone, { SendMessages: false });
+            if (owner) await ch4.permissionOverwrites.edit(owner, { SendMessages: true });
+            if (adminRole) await ch4.permissionOverwrites.edit(adminRole, { SendMessages: true });
+            if (modRole) await ch4.permissionOverwrites.edit(modRole, { SendMessages: true });
 
             await new Promise(r => setTimeout(r, 2000));
 
-            // 4. Приветствия
-            await ch1.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('GTA, Cyberpunk, Call of Duty и другие!\nАвто-обновление каждые 4 часа.').setTimestamp()] });
-            await ch2.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Патч-ноуты, скины, турниры!\nАвто-обновление.').setTimestamp()] });
-            await ch3.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ').setDescription('Tier List, сборки, рейтинги!\nКоманды в 💬-lol-komandy').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
+            // Приветствия
+            await ch1.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('Последние новости из мира игр!\n\nGTA, Cyberpunk, Call of Duty и другие.\nПеревод на русский язык.\nАвто-обновление каждые 4 часа.').setTimestamp()] });
+            await ch2.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Последние новости League of Legends!\n\nПатч-ноуты, новые чемпионы, скины.\nТурнирные новости.\nАвто-обновление.').setTimestamp()] });
+            await ch3.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ И СТАТИСТИКА').setDescription('Tier List, сборки, рейтинги!\n\nДанные: OP.GG | Патч 16.13\nАвто-обновление каждые 6-12 часов.').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
             await ch3.send({ embeds: [createTierListEmbed()] });
-            await ch4.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь!\n\n!tierlist - Tier List\n!top mid - Топ чемпионов\n!builds mid - Сборки\n!rating - Рейтинг\n!counter Ahri - Статистика').setTimestamp()] });
+            await ch4.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь! Бот ответит.\n\n**Доступные команды:**\n`!tierlist` — Tier List\n`!top mid` — Топ чемпионов\n`!builds mid` — Сборки\n`!rating` — Рейтинг\n`!counter Ahri` — Статистика\n`!lolnews` — Новости\n`!lolhelp` — Подробная помощь').setTimestamp()] });
 
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('✅ Каналы созданы!').setDescription('4 канала готовы к работе').setTimestamp()] });
+            await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('✅ Каналы созданы!').setDescription('📰-игровые-новости\n🎮-lol-новости\n⚔️-lol-гайды\n💬-lol-команды').setTimestamp()] });
 
         } catch (err) {
             console.error('❌ Ошибка gamenews:', err);
