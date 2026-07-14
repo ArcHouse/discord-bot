@@ -3,6 +3,7 @@ const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerSta
 const { Player } = require('discord-player');
 const { extractors, DefaultExtractors } = require('@discord-player/extractor');
 const RSSParser = require('rss-parser');
+const TelegramBot = require('node-telegram-bot-api');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -47,6 +48,44 @@ const player = new Player(client);
 player.extractors.loadMulti(DefaultExtractors).then(() => {
     console.log('🎵 Экстракторы музыки загружены!');
 });
+
+// ==================== TELEGRAM BOT ====================
+
+// Telegram бот для связи Discord ↔ Telegram
+let telegramBot = null;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+// Функция отправки сообщения в Telegram
+async function sendToTelegram(message, fromDiscord = true) {
+    if (!telegramBot || !TELEGRAM_CHAT_ID) return;
+
+    try {
+        const prefix = fromDiscord ? '💬 Discord: ' : '';
+        await telegramBot.sendMessage(TELEGRAM_CHAT_ID, prefix + message);
+    } catch (err) {
+        console.log('⚠️ Telegram ошибка:', err.message);
+    }
+}
+
+// Функция отправки embed в Telegram
+async function sendEmbedToTelegram(embed, fromDiscord = true) {
+    if (!telegramBot || !TELEGRAM_CHAT_ID) return;
+
+    try {
+        const prefix = fromDiscord ? '💬 Discord:\n' : '';
+        let text = prefix + embed.title + '\n\n';
+        if (embed.description) text += embed.description + '\n';
+        if (embed.fields) {
+            embed.fields.forEach(f => {
+                text += `\n${f.name}: ${f.value}`;
+            });
+        }
+        await telegramBot.sendMessage(TELEGRAM_CHAT_ID, text.substring(0, 4000));
+    } catch (err) {
+        console.log('⚠️ Telegram embed ошибка:', err.message);
+    }
+}
 
 // ==================== ИГРОВЫЕ НОВОСТИ ====================
 
@@ -1279,6 +1318,29 @@ commands.set('gamenews', {
     }
 });
 
+// --- ОТПРАВИТЬ В TELEGRAM ---
+
+commands.set('tg', {
+    name: 'tg',
+    description: 'Отправить сообщение в Telegram',
+    usage: '!tg [сообщение]',
+    async execute(message, args) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ!');
+        }
+
+        if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+            return message.reply('❌ Telegram не настроен! Добавь TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в .env');
+        }
+
+        const text = args.join(' ');
+        if (!text) return message.reply('❌ Напиши сообщение: !tg Привет из Discord!');
+
+        await sendToTelegram(text);
+        message.reply('✅ Отправлено в Telegram!');
+    }
+});
+
 // --- ОТПРАВИТЬ ПРИВЕТСТВИЯ ---
 
 commands.set('postwelcome', {
@@ -1996,6 +2058,36 @@ commands.set('poll', {
 client.on('ready', () => {
     console.log(`✅ Бот ${client.user.tag} запущен!`);
     client.user.setActivity('!help | Играю в игры', { type: ActivityType.Playing });
+
+    // Запуск Telegram бота (если настроен)
+    if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+        telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
+        console.log('✅ Telegram бот запущен!');
+
+        // Обработка сообщений из Telegram → Discord
+        telegramBot.on('message', async (msg) => {
+            if (msg.from.is_bot) return;
+
+            // Ищем канал для Telegram сообщений
+            for (const [, guild] of client.guilds.cache) {
+                const tgChannel = guild.channels.cache.find(ch =>
+                    ch.name.includes('telegram') || ch.name.includes('tg')
+                );
+                if (tgChannel) {
+                    const embed = new EmbedBuilder()
+                        .setColor(0x0099ff)
+                        .setTitle('📱 Telegram')
+                        .setDescription(`**${msg.from.first_name || msg.from.username}**: ${msg.text}`)
+                        .setFooter({ text: 'Telegram → Discord' })
+                        .setTimestamp();
+                    await tgChannel.send({ embeds: [embed] }).catch(() => {});
+                }
+            }
+        });
+
+        // Отправляем приветствие
+        sendToTelegram('✅ Бот Discord запущен и связан с сервером!');
+    }
 
     // ==================== РАСПИСАНИЕ ОБНОВЛЕНИЙ ====================
 
