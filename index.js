@@ -162,7 +162,7 @@ function getChampionImage(championName) {
         'Garen': 'Garen', 'Malphite': 'Malphite', 'Kayle': 'Kayle', 'Shen': 'Shen', 'Ornn': 'Ornn'
     };
     const id = champId[championName] || championName;
-    return `https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/${id}.png`;
+    return `https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/${id}.png`;
 }
 
 // Картинки предметов (Riot Data Dragon)
@@ -192,7 +192,7 @@ function getItemImage(itemName) {
         'Платье Рыцаря': '3157' // Zhonya's Hourglass
     };
     const itemId = items[itemName] || '1001'; // Default boot if not found
-    return `https://ddragon.leagueoflegends.com/cdn/14.7.1/img/item/${itemId}.png`;
+    return `https://ddragon.leagueoflegends.com/cdn/16.13.1/img/item/${itemId}.png`;
 }
 
 // ТIER EMOJI
@@ -213,7 +213,7 @@ function createTierListEmbed() {
         .setColor(0xffd700)
         .setTitle('📊 TIER LIST — Патч 16.13')
         .setDescription('**Рейтинг чемпионов по тирам** (Emerald+)\n\nДанные: OP.GG | 38.6M анализов')
-        .setImage('https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/Ahri.png')
+        .setImage('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png')
         .setFooter({ text: 'Обновляется каждую неделю | Данные: OP.GG' })
         .setTimestamp();
 
@@ -228,24 +228,13 @@ function createTierListEmbed() {
     return embed;
 }
 
-// Создание embed для ТОП по позициям (С КАРТИНКАМИ)
+// Создание embed для ТОП по позициям (С КАРТИНКАМИ ЧЕМПИОНОВ)
 function createTopChampionsEmbed(position) {
     const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
     const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
     const champions = LOL_CHAMPIONS[position];
 
     if (!champions) return null;
-
-    // Эмодзи для предметов
-    const itemEmojis = {
-        'Луден': '🟣', 'Светлячок': '🔵', 'Бездонная маска': '🟠',
-        'Чертоги': '🟢', 'Сфера Void': '🔴', 'Пламя Рыцаря': '🟤',
-        'Клятва Крушителя': '🟡', 'Танцующий меч': '⚪', 'Бесконечный голод': '🔵',
-        'Доминик': '🔴', 'Смертельный танец': '⚫', 'Зимняя гора': '🟣',
-        'Запредельная сила': '🟢', 'Воздаятель': '🔵', 'Медальон': '🟤',
-        'Черный топор': '⚫', 'Костяной щит': '🟡', 'Джунгл предмет': '🟣',
-        'Клятва': '🟡', 'Клинок': '⚪', 'Ледяной шлем': '🔵', 'Платье Рыцаря': '🟠'
-    };
 
     const embeds = [];
 
@@ -258,16 +247,10 @@ function createTopChampionsEmbed(position) {
         .setTimestamp();
     embeds.push(mainEmbed);
 
-    // Каждый чемпион отдельным embed
+    // Каждый чемпион отдельным embed с картинкой
     for (let i = 0; i < Math.min(champions.length, 5); i++) {
         const champ = champions[i];
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-
-        // Формируем строку предметов с эмодзи
-        const itemsWithEmojis = champ.items.map(item => {
-            const emoji = itemEmojis[item] || '⬛';
-            return `${emoji} **${item}**`;
-        }).join(' → ');
 
         const champEmbed = new EmbedBuilder()
             .setColor(getTierColor(champ.tier))
@@ -275,48 +258,22 @@ function createTopChampionsEmbed(position) {
             .setDescription(`**Win Rate:** ${champ.winRate} | **Pick Rate:** ${champ.pickRate} | **Ban Rate:** ${champ.banRate}`)
             .addFields(
                 { name: '🔮 Руна', value: champ.rune, inline: true },
-                { name: '🛡 Сборка', value: itemsWithEmojis, inline: false }
+                { name: '🛡 Сборка', value: champ.items.join(' → '), inline: false }
             )
-            .setThumbnail(getChampionImage(champ.name));
+            .setImage(getChampionImage(champ.name));
         embeds.push(champEmbed);
     }
 
     return embeds;
 }
 
-// Создание сборок embed (С КАРТИНКАМИ ПРЕДМЕТОВ)
+// Создание сборок embed (С КАРТИНКАМИ ЧЕМПИОНОВ)
 function createBuildsEmbed(position) {
     const champions = LOL_CHAMPIONS[position];
     if (!champions) return null;
 
     const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
     const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
-
-    // Эмодзи для предметов (цветные квадратики)
-    const itemEmojis = {
-        'Луден': '🟣',
-        'Светлячок': '🔵',
-        'Бездонная маска': '🟠',
-        'Чертоги': '🟢',
-        'Сфера Void': '🔴',
-        'Пламя Рыцаря': '🟤',
-        'Клятва Крушителя': '🟡',
-        'Танцующий меч': '⚪',
-        'Бесконечный голод': '🔵',
-        'Доминик': '🔴',
-        'Смертельный танец': '⚫',
-        'Зимняя гора': '🟣',
-        'Запредельная сила': '🟢',
-        'Воздаятель': '🔵',
-        'Медальон': '🟤',
-        'Черный топор': '⚫',
-        'Костяной щит': '🟡',
-        'Джунгл предмет': '🟣',
-        'Клятва': '🟡',
-        'Клинок': '⚪',
-        'Ледяной шлем': '🔵',
-        'Платье Рыцаря': '🟠'
-    };
 
     const embeds = [];
 
@@ -329,15 +286,9 @@ function createBuildsEmbed(position) {
         .setTimestamp();
     embeds.push(mainEmbed);
 
-    // Каждая сборка отдельным embed
+    // Каждая сборка отдельным embed с картинкой чемпиона
     for (let i = 0; i < Math.min(champions.length, 3); i++) {
         const champ = champions[i];
-
-        // Формируем строку предметов с эмодзи
-        const itemsWithEmojis = champ.items.map(item => {
-            const emoji = itemEmojis[item] || '⬛';
-            return `${emoji} **${item}**`;
-        }).join(' → ');
 
         const buildEmbed = new EmbedBuilder()
             .setColor(getTierColor(champ.tier))
@@ -345,9 +296,9 @@ function createBuildsEmbed(position) {
             .setDescription(`**Win Rate:** ${champ.winRate}`)
             .addFields(
                 { name: '🔮 Руна', value: champ.rune, inline: true },
-                { name: '🛡 Сборка', value: itemsWithEmojis, inline: false }
+                { name: '🛡 Сборка', value: champ.items.join(' → '), inline: false }
             )
-            .setThumbnail(getChampionImage(champ.name));
+            .setImage(getChampionImage(champ.name));
         embeds.push(buildEmbed);
     }
 
@@ -1303,7 +1254,7 @@ commands.set('postwelcome', {
                         { name: '🏆 Рейтинг', value: 'Топ-5 чемпионов по Win Rate', inline: true },
                         { name: '💬 Где писать команды?', value: 'В канале **💬-lol-команды**!', inline: false }
                     )
-                    .setThumbnail('https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/Ahri.png')
+                    .setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png')
                     .setFooter({ text: 'Данные: OP.GG | Обновляется автоматически' })
                     .setTimestamp();
                 await lolGuidesChannel.send({ embeds: [lolGuidesEmbed] });
@@ -1552,7 +1503,7 @@ commands.set('lolhelp', {
                 { name: 'Сборки', value: 'Каждые 8 часов (10:00, 18:00)', inline: true },
                 { name: 'Рейтинг', value: 'Каждые 12 часов (00:00, 12:00)', inline: true }
             )
-            .setThumbnail('https://ddragon.leagueoflegends.com/cdn/14.7.1/img/champion/Ahri.png')
+            .setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png')
             .setFooter({ text: 'Данные: OP.GG | Все данные на русском языке' })
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
