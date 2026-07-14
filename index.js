@@ -1932,6 +1932,10 @@ client.on('ready', () => {
     const ratingHours = [0, 12];
     console.log(`🏆 LOL Рейтинг: ${ratingHours.join(':00, ')}:00`);
 
+    // 📺 LOL YOUTUBE - каждые 6 часов (11:00, 17:00, 23:00)
+    const youtubeHours = [11, 17, 23];
+    console.log(`📺 LOL YouTube: ${youtubeHours.join(':00, ')}:00`);
+
     // Проверяем каждые 30 минут
     setInterval(async () => {
         const currentHour = new Date().getHours();
@@ -1973,6 +1977,33 @@ client.on('ready', () => {
                 const lolGuidesChannel = guild.channels.cache.find(ch => ch.name.includes('lol-гайды'));
                 if (lolGuidesChannel) {
                     await lolGuidesChannel.send({ embeds: [createRatingEmbed()] }).catch(() => {});
+                }
+            }
+        }
+
+        // 📺 LOL YouTube видео (в канал lol-гайды)
+        if (youtubeHours.includes(currentHour)) {
+            console.log('📺 Обновляю LOL YouTube видео...');
+            for (const [, guild] of client.guilds.cache) {
+                const lolGuidesChannel = guild.channels.cache.find(ch => ch.name.includes('lol-гайды'));
+                if (lolGuidesChannel) {
+                    const videos = await fetchLoLYouTube();
+                    if (videos.length > 0) {
+                        const embed = new EmbedBuilder()
+                            .setColor(0xff0000)
+                            .setTitle('📺 СВЕЖИЕ LOL ВИДЕО')
+                            .setDescription('Лучшие гайды и обзоры с YouTube')
+                            .setFooter({ text: 'Авто-обновление' })
+                            .setTimestamp();
+                        for (const video of videos) {
+                            embed.addFields({
+                                name: video.title,
+                                value: `[Смотреть](${video.link})`,
+                                inline: false
+                            });
+                        }
+                        await lolGuidesChannel.send({ embeds: [embed] }).catch(() => {});
+                    }
                 }
             }
         }
