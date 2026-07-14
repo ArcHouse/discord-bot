@@ -116,11 +116,22 @@ async function postNewsToChannel(client) {
     try {
         // Ищем канал "🎮-новости" на всех серверах
         for (const [, guild] of client.guilds.cache) {
-            const newsChannel = guild.channels.cache.find(ch => ch.name === '🎮-новости');
-            if (!newsChannel) continue;
+            const newsChannel = guild.channels.cache.find(ch => ch.name.includes('новости'));
+            if (!newsChannel) {
+                console.log('⚠️ Канал новостей не найден на сервере:', guild.name);
+                continue;
+            }
 
+            console.log(`📰 Проверяю новости для ${guild.name}...`);
             const news = await fetchGameNews();
+            console.log(`📰 Получено ${news.length} новостей`);
 
+            if (news.length === 0) {
+                console.log('⚠️ Нет новостей для публикации');
+                continue;
+            }
+
+            let posted = 0;
             for (const item of news) {
                 // Проверяем, не публиковали ли уже эту новость
                 const newsId = `${item.source}-${item.title}`;
@@ -142,14 +153,19 @@ async function postNewsToChannel(client) {
                     .setURL(item.link)
                     .setTimestamp();
 
-                await newsChannel.send({ embeds: [embed] }).catch(() => {});
+                await newsChannel.send({ embeds: [embed] }).catch(err => {
+                    console.error('❌ Ошибка отправки:', err.message);
+                });
 
                 // Добавляем в опубликованные
                 publishedNews.add(newsId);
+                posted++;
 
                 // Задержка между сообщениями (чтобы не спамить)
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 1500));
             }
+
+            console.log(`✅ Опубликовано ${posted} новых новостей`);
         }
     } catch (err) {
         console.error('❌ Ошибка публикации новостей:', err);
@@ -189,20 +205,18 @@ async function translateToRussian(text) {
     if (!text || text.length < 10) return text;
 
     try {
-        // Используем LibreTranslate API (бесплатный)
-        const response = await fetch('https://libretranslate.de/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                q: text.substring(0, 500), // Ограничиваем длину
-                source: 'en',
-                target: 'ru'
-            })
-        });
+        // Используем MyMemory API (бесплатный, без ключа)
+        const encodedText = encodeURIComponent(text.substring(0, 500));
+        const response = await fetch(
+            `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=en|ru`,
+            { signal: AbortSignal.timeout(5000) }
+        );
 
         if (response.ok) {
             const data = await response.json();
-            return data.translatedText || text;
+            if (data.responseStatus === 200 && data.responseData?.translatedText) {
+                return data.responseData.translatedText;
+            }
         }
     } catch (err) {
         console.error('⚠️ Ошибка перевода:', err.message);
