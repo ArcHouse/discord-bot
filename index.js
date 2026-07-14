@@ -353,12 +353,6 @@ commands.set('play', {
         if (!query) return message.reply('❌ Укажи название или ссылку: !play Never Gonna Give You Up');
 
         try {
-            const searchResult = await player.search(query, { requestedBy: message.author });
-
-            if (!searchResult || !searchResult.tracks.length) {
-                return message.reply('❌ Ничего не нашёл!');
-            }
-
             const queue = player.nodes.create(message.guild, {
                 metadata: { channel: message.channel },
                 leaveOnEmpty: true,
@@ -367,37 +361,36 @@ commands.set('play', {
                 volume: 50,
             });
 
-            try {
-                if (!queue.connection) {
-                    await queue.connect(voiceChannel.id);
-                }
-            } catch (err) {
-                console.error('❌ Ошибка подключения:', err.message);
-                player.nodes.delete(message.guild);
-                return message.reply('❌ Не могу подключиться к голосовому каналу!');
+            if (!queue.connection) {
+                await queue.connect(voiceChannel);
             }
 
-            queue.addTrack(searchResult.tracks[0]);
-
-            if (!queue.isPlaying()) {
-                await queue.play();
-            }
+            const track = await player.play(voiceChannel, query, {
+                nodeOptions: {
+                    metadata: { channel: message.channel },
+                    leaveOnEmpty: true,
+                    leaveOnEnd: true,
+                    selfDeaf: true,
+                    volume: 50,
+                },
+                requestedBy: message.author,
+            });
 
             const embed = new EmbedBuilder()
                 .setColor(0x00ff00)
                 .setTitle('🎵 Добавлено в очередь')
                 .addFields(
-                    { name: 'Трек', value: searchResult.tracks[0].title, inline: true },
-                    { name: 'Длительность', value: searchResult.tracks[0].duration, inline: true },
-                    { name: 'Автор', value: searchResult.tracks[0].author, inline: true }
+                    { name: 'Трек', value: track.track.title, inline: true },
+                    { name: 'Длительность', value: track.track.duration, inline: true },
+                    { name: 'Автор', value: track.track.author, inline: true }
                 )
-                .setThumbnail(searchResult.tracks[0].thumbnail)
+                .setThumbnail(track.track.thumbnail)
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         } catch (err) {
             console.error('❌ Ошибка музыки:', err.message);
             console.error(err.stack);
-            message.reply(`❌ Ошибка при воспроизведении: ${err.message.substring(0, 200)}`);
+            message.reply(`❌ Ошибка: ${err.message.substring(0, 200)}`);
         }
     }
 });
