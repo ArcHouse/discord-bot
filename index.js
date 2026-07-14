@@ -50,15 +50,43 @@ player.extractors.loadMulti(DefaultExtractors).then(() => {
 // Логирование событий плеера
 player.events.on('playerStart', (queue, track) => {
     console.log(`🎵 Воспроизведение: ${track.title}`);
+    console.log(`🔗 Голосовой канал: ${queue.channel?.name || 'неизвестно'}`);
+});
+
+player.events.on('playerFinish', (queue, track) => {
+    console.log(`✅ Трек завершён: ${track.title}`);
+});
+
+player.events.on('playerSkip', (queue, track) => {
+    console.log(`⏭️ Трек пропущен: ${track.title}`);
 });
 
 player.events.on('playerError', (queue, error, track) => {
     console.error(`❌ Ошибка плеера: ${error.message}`);
+    console.error(`❌ Трек: ${track?.title || 'неизвестно'}`);
     console.error(error.stack);
 });
 
 player.events.on('error', (queue, error) => {
     console.error(`❌ Ошибка очереди: ${error.message}`);
+    console.error(error.stack);
+});
+
+player.events.on('connectionError', (queue, error) => {
+    console.error(`❌ Ошибка подключения: ${error.message}`);
+    console.error(error.stack);
+});
+
+player.events.on('disconnect', (queue) => {
+    console.log(`🔌 Отключено от голосового канала`);
+});
+
+player.events.on('emptyChannel', (queue) => {
+    console.log(`📭 Канал пуст, отключаемся`);
+});
+
+player.events.on('emptyQueue', (queue) => {
+    console.log(`📭 Очередь пуста`);
 });
 
 player.events.on('connectionError', (queue, error) => {
