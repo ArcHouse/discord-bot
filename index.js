@@ -2299,6 +2299,23 @@ setInterval(async () => {
     }
 }, 10000);
 
+
+// ==================== HTTP HEALTHCHECK (для Render.com) ====================
+const http = require('http');
+const server = http.createServer((req, res) => {
+    if (req.url === '/healthcheck' || req.url === '/') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('OK - Zohan Mimo Bot is running!');
+    } else {
+        res.writeHead(404);
+        res.end('Not found');
+    }
+});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`✅ HTTP-сервер запущен на порту ${PORT}`);
+});
+
 // ==================== Р—РђРџРЈРЎРљ ====================
 
 client.login(process.env.TOKEN);

@@ -1,0 +1,16 @@
+services:
+  - type: worker
+    name: discord-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: TOKEN
+        sync: false
+      - key: PREFIX
+        value: "!"
+      - key: WELCOME_CHANNEL
+        value: "general"
+      - key: AUTOROLE
+        value: "@Member"
