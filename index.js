@@ -528,7 +528,7 @@ async function postNewsToChannel(client) {
         // РС‰РµРј РєР°РЅР°Р» РґР»СЏ РѕР±С‰РёС… РёРіСЂРѕРІС‹С… РЅРѕРІРѕСЃС‚РµР№ (РЅРµ LOL)
         for (const [, guild] of client.guilds.cache) {
             const newsChannel = guild.channels.cache.find(ch => 
-                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('igrovye-novosti') || ch.name.includes('РёРіСЂРѕРІС‹Рµ-РЅРѕРІРѕСЃС‚Рё')) && 
+                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('РёРіСЂРѕРІС‹Рµ-РЅРѕРІРѕСЃС‚Рё')) && 
                 !ch.name.includes('lol')
             );
             if (!newsChannel) {
@@ -1371,7 +1371,7 @@ commands.set('lolnews', {
             }
 
             const embeds = news.map(item => {
-                const translatedTitle = item.title;
+                // item.title уже переведён в fetchLoLNews()
                 const embed = new EmbedBuilder()
                     .setColor(0x00ff00)
                     .setTitle(`${item.emoji} ${item.title}`)
@@ -1417,7 +1417,7 @@ commands.set('lolhelp', {
                 { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџЏ† Р Р•Р™РўРРќР“**', inline: false },
                 { name: '`!rating`', value: 'Р РµР№С‚РёРЅРі С‡РµРјРїРёРѕРЅРѕРІ РїРѕ РїРѕР·РёС†РёСЏРј\nРџСЂРёРјРµСЂ: `!rating`', inline: false },
                 { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ›Ў РљРћРќРўР Р«**', inline: false },
-                { name: '`!counter [С‡РµРјРїРёРѕРЅ]`', value: 'Р›СѓС‡С€РёРµ РєРѕРЅС‚СЂС‹ РїСЂРѕС‚РёРІ С‡РµРјРїРёРѕРЅР°\nРџСЂРёРјРµСЂ: `!counter Locke`', inline: false },
+                { name: '`!counter [С‡РµРјРїРёРѕРЅ]`', value: 'Р›СѓС‡С€РёРµ РєРѕРЅС‚СЂС‹ РїСЂРѕС‚РёРІ С‡РµРјРїРёРѕРЅР°\nРџСЂРёРјРµСЂ: `!counter Ahri`', inline: false },
                 { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ“° РќРћР’РћРЎРўР**', inline: false },
                 { name: '`!lolnews`', value: 'РќРѕРІРѕСЃС‚Рё LOL РЅР° СЂСѓСЃСЃРєРѕРј СЏР·С‹РєРµ СЃ РєР°СЂС‚РёРЅРєР°РјРё\nРСЃС‚РѕС‡РЅРёРєРё: Surrender at 20, LoL Esports, LeagueFeed\nРџСЂРёРјРµСЂ: `!lolnews`', inline: false },
                 { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**вЏ° РђР’РўРћ-РћР‘РќРћР’Р›Р•РќРР•**', inline: false },
@@ -1967,6 +1967,10 @@ client.on('ready', () => {
                         }
                     }
                     console.log(`✅ LOL: опубликовано ${embeds.length} новостей (${Math.ceil(embeds.length / 10)} сообщений)`);
+                }
+            }
+        }
+
 
         // вљ”пёЏ LOL Tier List (РІ РєР°РЅР°Р» lol-РіР°Р№РґС‹)
         if (tierListHours.includes(currentHour)) {
@@ -2017,7 +2021,7 @@ client.on('ready', () => {
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
-    if (!message.content.startsWith(process.env.PREFIX)) return;
+    if (!message.content.startsWith(process.env.PREFIX || '!')) return;
 
     const args = message.content.slice(process.env.PREFIX.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
@@ -2082,6 +2086,7 @@ client.on('guildMemberRemove', async (member) => {
 // Р›РћР“РР РћР’РђРќРР•: СѓРґР°Р»С‘РЅРЅС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ
 client.on('messageDelete', async (message) => {
     if (message.author.bot) return;
+    if (!message.guild) return;
     const logChannel = message.guild.channels.cache.find(ch => ch.name === 'рџ“‹-Р»РѕРіРё');
     if (!logChannel) return;
 
@@ -2100,6 +2105,7 @@ client.on('messageDelete', async (message) => {
 // Р›РћР“РР РћР’РђРќРР•: edited СЃРѕРѕР±С‰РµРЅРёСЏ
 client.on('messageUpdate', async (oldMessage, newMessage) => {
     if (oldMessage.author.bot) return;
+    if (!oldMessage.guild) return;
     if (oldMessage.content === newMessage.content) return;
     const logChannel = oldMessage.guild.channels.cache.find(ch => ch.name === 'рџ“‹-Р»РѕРіРё');
     if (!logChannel) return;
@@ -2151,6 +2157,7 @@ client.on('guildBanRemove', async (ban) => {
 // РђРќРўР-РЎРџРђРњ Рё РђРќРўР-РЎРЎР«Р›РљР
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
+    if (!message.member) return;
     if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
 
     const userId = message.author.id;
