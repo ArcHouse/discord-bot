@@ -698,10 +698,15 @@ function sanitizeText(text) {
 
 // Перевод текста на русский (через бесплатный API)
 async function translateToRussian(text) {
-    if (!text || text.length < 10) return text;
+    if (!text || text.length < 5) return text;
 
     const cleaned = sanitizeText(text);
-    if (cleaned.length < 10) return cleaned;
+    if (cleaned.length < 5) return cleaned;
+
+    // Если текст уже на русском — не переводим
+    if (/[а-яА-ЯёЁ]/.test(cleaned) && cleaned.split('').filter(c => /[а-яА-ЯёЁ]/.test(c)).length > cleaned.length * 0.3) {
+        return cleaned;
+    }
 
     try {
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -709,27 +714,28 @@ async function translateToRussian(text) {
                 const encodedText = encodeURIComponent(cleaned.substring(0, 500));
                 const response = await fetch(
                     `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=en|ru&de=bot@discord.com`,
-                    { signal: AbortSignal.timeout(8000) }
+                    { signal: AbortSignal.timeout(10000) }
                 );
                 if (response.ok) {
                     const data = await response.json();
                     if (data.responseStatus === 200 && data.responseData?.translatedText) {
                         const translated = data.responseData.translatedText;
-                        if (translated !== cleaned && !translated.includes('MYMEMORY WARNING')) {
+                        if (translated && translated !== cleaned && !translated.includes('MYMEMORY WARNING')) {
                             return translated;
                         }
                     }
                 }
-                await new Promise(r => setTimeout(r, 1500));
+                await new Promise(r => setTimeout(r, 2000));
             } catch (e) {
-                await new Promise(r => setTimeout(r, 1500));
+                await new Promise(r => setTimeout(r, 2000));
             }
         }
     } catch (err) {
         console.error('⚠️ Ошибка перевода:', err.message);
     }
 
-    return text;
+    // Fallback — возвращаем текст как есть
+    return cleaned;
 }
 
 // ==================== КОМАНДЫ ====================
@@ -1840,6 +1846,66 @@ commands.set('clearnews', {
         } catch (err) {
             message.reply('❌ Ошибка при очистке: ' + err.message);
         }
+    }
+});
+
+// --- ПЕРЕСОЗДАТЬ КАНАЛ НОВОСТЕЙ ---
+
+commands.set('setupnews', {
+    name: 'setupnews',
+    description: 'Удалить и заново создать канал игровых новостей',
+    usage: '!setupnews',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ!');
+        }
+
+        // Удаляем старый канал
+        const oldChannel = message.guild.channels.cache.find(ch =>
+            ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')
+        );
+        if (oldChannel) {
+            await oldChannel.delete().catch(() => {});
+            await new Promise(r => setTimeout(r, 1000));
+        }
+
+        // Ищем категорию ИГРОВЫЕ НОВОСТИ
+        let category = message.guild.channels.cache.find(ch => ch.name.includes('ИГРОВЫЕ НОВОСТИ') && ch.type === ChannelType.GuildCategory);
+        if (!category) {
+            category = await message.guild.channels.create({
+                name: '🎮 ИГРОВЫЕ НОВОСТИ',
+                type: ChannelType.GuildCategory,
+            }).catch(() => null);
+        }
+
+        // Создаём новый канал
+        const newChannel = await message.guild.channels.create({
+            name: '🎮-игровые-новости',
+            type: ChannelType.GuildText,
+            parent: category?.id || undefined,
+        }).catch(() => null);
+
+        if (!newChannel) return message.reply('❌ Не удалось создать канал!');
+
+        // Делаем канал read-only для @everyone
+        await newChannel.permissionOverwrites.edit(message.guild.roles.everyone, {
+            SendMessages: false,
+            ViewChannel: true,
+        }).catch(() => {});
+
+        // Приветственное сообщение
+        const embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('🎮 Игровые новости')
+            .setDescription('Сюда бот будет автоматически постить игровые новости на русском языке с картинками.\n\n📰 Новости появляются 3 раза в день: 08:00, 14:00, 20:00')
+            .setTimestamp();
+
+        await newChannel.send({ embeds: [embed] });
+
+        // Триггерим первый пост новостей
+        await postNewsToChannel(message.client);
+
+        message.reply(`✅ Канал ${newChannel} создан! Первая порция новостей отправлена.`);
     }
 });
 
