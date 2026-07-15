@@ -591,14 +591,13 @@ async function fetchLoLNews() {
 // Функция публикации новости в канал
 async function postNewsToChannel(client) {
     try {
-        // Ищем канал для общих игровых новостей (не LOL)
         for (const [, guild] of client.guilds.cache) {
-            const newsChannel = guild.channels.cache.find(ch => 
-                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')) && 
+            const newsChannel = guild.channels.cache.find(ch =>
+                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')) &&
                 !ch.name.includes('lol')
             );
             if (!newsChannel) {
-                console.log('⚠️ Канал новостей не найден на сервере:', guild.name);
+                console.log('⚠️ Канал новостей не найден:', guild.name);
                 continue;
             }
 
@@ -607,15 +606,21 @@ async function postNewsToChannel(client) {
             console.log(`📰 Получено ${news.length} новостей`);
 
             if (news.length === 0) {
-                console.log('⚠️ Нет новостей для публикации');
+                console.log('⚠️ Нет новостей');
                 continue;
             }
 
             let posted = 0;
+            const MAX_POSTS = 5; // Максимум 5 новостей за раз
+
             for (const item of news) {
-                // Проверяем, не публиковали ли уже эту новость
-                const newsId = `${item.source}-${item.title}`;
-                if (publishedNews.has(newsId)) continue;
+                if (posted >= MAX_POSTS) break;
+
+                // Дедупликация по ссылке (самый надёжный способ)
+                if (item.link && publishedNews.has(item.link)) continue;
+                // Дедупликация по заголовку (fallback)
+                const titleKey = item.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
+                if (publishedNews.has('title:' + titleKey)) continue;
 
                 // Переводим заголовок и описание на русский
                 const translatedTitle = await translateToRussian(item.title);
@@ -633,25 +638,20 @@ async function postNewsToChannel(client) {
                     .setURL(item.link)
                     .setTimestamp();
 
-                // Добавляем картинку если есть
                 if (item.image) {
-                    try {
-                        embed.setImage(item.image);
-                    } catch (err) {
-                        // Картинка может быть недоступна - просто пропускаем
-                    }
+                    try { embed.setImage(item.image); } catch (err) {}
                 }
 
                 await newsChannel.send({ embeds: [embed] }).catch(err => {
                     console.error('❌ Ошибка отправки:', err.message);
                 });
 
-                // Добавляем в опубликованные
-                publishedNews.add(newsId);
+                // Сохраняем для дедупликации
+                if (item.link) publishedNews.add(item.link);
+                publishedNews.add('title:' + titleKey);
                 posted++;
 
-                // Задержка между сообщениями (чтобы не спамить)
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
 
             console.log(`✅ Опубликовано ${posted} новых новостей`);
