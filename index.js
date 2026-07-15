@@ -1,4 +1,7 @@
-const BOT_VERSION = 'v3.0.0-fixed-ru';
+const BOT_VERSION = 'v3.2.0-fixed-http';
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
 const RSSParser = require('rss-parser');
 const TelegramBot = require('node-telegram-bot-api');
