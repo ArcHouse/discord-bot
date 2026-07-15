@@ -574,7 +574,7 @@ async function postNewsToChannel(client) {
         // РС‰РµРј РєР°РЅР°Р» РґР»СЏ РѕР±С‰РёС… РёРіСЂРѕРІС‹С… РЅРѕРІРѕСЃС‚РµР№ (РЅРµ LOL)
         for (const [, guild] of client.guilds.cache) {
             const newsChannel = guild.channels.cache.find(ch => 
-                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('РёРіСЂРѕРІС‹Рµ-РЅРѕРІРѕСЃС‚Рё')) && 
+                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')) && 
                 !ch.name.includes('lol')
             );
             if (!newsChannel) {
@@ -695,7 +695,7 @@ async function translateToRussian(text) {
                     const data = await response.json();
                     if (data.responseStatus === 200 && data.responseData?.translatedText) {
                         const translated = data.responseData.translatedText;
-                        if (translated !== cleanText && !translated.includes('MYMEMORY WARNING')) {
+                        if (translated !== cleaned && !translated.includes('MYMEMORY WARNING')) {
                             return translated;
                         }
                     }
@@ -720,7 +720,7 @@ const commands = new Map();
 
 commands.set('kick', {
     name: 'kick',
-    description: 'Р’С‹РіРЅР°С‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°',
+    description: 'Выгнать участника',
     usage: '!kick @user [РїСЂРёС‡РёРЅР°]',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
@@ -1168,13 +1168,13 @@ commands.set('gamenews', {
             const category = await guild.channels.create({ name: 'рџЋ® РР“Р РћР’Р«Р• РќРћР’РћРЎРўР', type: 4 });
             await new Promise(r => setTimeout(r, 1000));
 
-            const ch1 = await guild.channels.create({ name: 'рџ“°-РёРіСЂРѕРІС‹Рµ-РЅРѕРІРѕСЃС‚Рё', type: 0, parent: category });
+            const ch1 = await guild.channels.create({ name: 'рџ“°-игровые-новости', type: 0, parent: category });
             await new Promise(r => setTimeout(r, 500));
-            const ch2 = await guild.channels.create({ name: 'рџЋ®-lol-РЅРѕРІРѕСЃС‚Рё', type: 0, parent: category });
+            const ch2 = await guild.channels.create({ name: 'рџЋ®-lol-новости', type: 0, parent: category });
             await new Promise(r => setTimeout(r, 500));
-            const ch3 = await guild.channels.create({ name: 'вљ”пёЏ-lol-РіР°Р№РґС‹', type: 0, parent: category });
+            const ch3 = await guild.channels.create({ name: 'вљ”пёЏ-lol-гайды', type: 0, parent: category });
             await new Promise(r => setTimeout(r, 500));
-            const ch4 = await guild.channels.create({ name: 'рџ’¬-lol-РєРѕРјР°РЅРґС‹', type: 0, parent: category });
+            const ch4 = await guild.channels.create({ name: 'рџ’¬-lol-команды', type: 0, parent: category });
 
             const everyone = guild.roles.everyone;
             const owner = await guild.members.fetch(guild.ownerId).catch(() => null);
@@ -1203,7 +1203,7 @@ commands.set('gamenews', {
             await ch3.send({ embeds: [createTierListEmbed()] });
             await ch4.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('рџ’¬ LOL РљРћРњРђРќР”Р«').setDescription('РџРёС€РёС‚Рµ РєРѕРјР°РЅРґС‹ Р·РґРµСЃСЊ! Р‘РѕС‚ РѕС‚РІРµС‚РёС‚.\n\n**Р”РѕСЃС‚СѓРїРЅС‹Рµ РєРѕРјР°РЅРґС‹:**\n`!tierlist` вЂ” Tier List\n`!top mid` вЂ” РўРѕРї С‡РµРјРїРёРѕРЅРѕРІ\n`!builds mid` вЂ” РЎР±РѕСЂРєРё\n`!rating` вЂ” Р РµР№С‚РёРЅРі\n`!counter Ahri` вЂ” РЎС‚Р°С‚РёСЃС‚РёРєР°\n`!lolnews` вЂ” РќРѕРІРѕСЃС‚Рё\n`!lolhelp` вЂ” РџРѕРґСЂРѕР±РЅР°СЏ РїРѕРјРѕС‰СЊ').setTimestamp()] });
 
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('вњ… РљР°РЅР°Р»С‹ СЃРѕР·РґР°РЅС‹!').setDescription('рџ“°-РёРіСЂРѕРІС‹Рµ-РЅРѕРІРѕСЃС‚Рё\nрџЋ®-lol-РЅРѕРІРѕСЃС‚Рё\nвљ”пёЏ-lol-РіР°Р№РґС‹\nрџ’¬-lol-РєРѕРјР°РЅРґС‹').setTimestamp()] });
+            await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('вњ… РљР°РЅР°Р»С‹ СЃРѕР·РґР°РЅС‹!').setDescription('рџ“°-игровые-новости\nрџЋ®-lol-новости\nвљ”пёЏ-lol-гайды\nрџ’¬-lol-команды').setTimestamp()] });
 
         } catch (err) {
             console.error('вќЊ РћС€РёР±РєР° gamenews:', err);
@@ -1270,7 +1270,7 @@ commands.set('postwelcome', {
                 }
                 
                 if (name.includes('lol') && name.includes('РіР°Р№РґС‹')) {
-                    await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('вљ”пёЏ LOL Р“РђР™Р”Р«').setDescription('Tier List, СЃР±РѕСЂРєРё, СЂРµР№С‚РёРЅРіРё!\nРџРёС€РёС‚Рµ РєРѕРјР°РЅРґС‹ РІ рџ’¬-lol-РєРѕРјР°РЅРґС‹').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('вљ”пёЏ LOL Р“РђР™Р”Р«').setDescription('Tier List, СЃР±РѕСЂРєРё, СЂРµР№С‚РёРЅРіРё!\nРџРёС€РёС‚Рµ РєРѕРјР°РЅРґС‹ РІ рџ’¬-lol-команды').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
                     await channel.send({ embeds: [createTierListEmbed()] });
                     sent++;
                 }
@@ -1639,7 +1639,7 @@ commands.set('modcommands', {
             .setDescription('РўРѕР»СЊРєРѕ РґР»СЏ РјРѕРґРµСЂР°С‚РѕСЂРѕРІ Рё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРІ')
             .addFields(
                 { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ›ЎпёЏ РњРћР”Р•Р РђР¦РРЇ**', inline: false },
-                { name: '`!kick @user [РїСЂРёС‡РёРЅР°]`', value: 'Р’С‹РіРЅР°С‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
+                { name: '`!kick @user [РїСЂРёС‡РёРЅР°]`', value: 'Выгнать участника', inline: true },
                 { name: '`!ban @user [РїСЂРёС‡РёРЅР°]`', value: 'Р—Р°Р±Р°РЅРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
                 { name: '`!unban ID`', value: 'Р Р°Р·Р±Р°РЅРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
                 { name: '`!mute @user [РјРёРЅСѓС‚С‹] [РїСЂРёС‡РёРЅР°]`', value: 'Р—Р°РјСѓС‚РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
@@ -1657,7 +1657,7 @@ commands.set('modcommands', {
                 { name: '`!modcommands #РєР°РЅР°Р»`', value: 'Р­С‚РѕС‚ СЃРїРёСЃРѕРє', inline: true },
                 { name: '`!gamenews`', value: 'РЎРѕР·РґР°С‚СЊ РєР°С‚РµРіРѕСЂРёСЋ "рџЋ® РР“Р РћР’Р«Р• РќРћР’РћРЎРўР"', inline: true },
                 { name: '`!news`', value: 'РћР±РЅРѕРІРёС‚СЊ РЅРѕРІРѕСЃС‚Рё РІСЂСѓС‡РЅСѓСЋ', inline: true },
-                { name: '`!dellolcommands`', value: 'РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» lol-РєРѕРјР°РЅРґС‹', inline: true },
+                { name: '`!dellolcommands`', value: 'РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» lol-команды', inline: true },
                 { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ›ЎпёЏ РђР’РўРћРњРђРўРР§Р•РЎРљР**', inline: false },
                 { name: 'Р›РѕРіРёСЂРѕРІР°РЅРёРµ', value: 'РЈРґР°Р»РµРЅРёРµ/СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ РІ #рџ“‹-Р»РѕРіРё', inline: true },
                 { name: 'РџСЂРѕС‰Р°РЅРёРµ', value: 'РЎРѕРѕР±С‰РµРЅРёРµ РєРѕРіРґР° РєС‚Рѕ-С‚Рѕ РІС‹С€РµР»', inline: true }
@@ -1740,14 +1740,14 @@ commands.set('deltickets', {
 
 commands.set('dellolcommands', {
     name: 'dellolcommands',
-    description: 'РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» lol-РєРѕРјР°РЅРґС‹',
+    description: 'РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» lol-команды',
     usage: '!dellolcommands',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ!');
         }
 
-        const channel = message.guild.channels.cache.find(ch => ch.name.includes('lol-komandy') || ch.name.includes('lol-РєРѕРјР°РЅРґС‹'));
+        const channel = message.guild.channels.cache.find(ch => ch.name.includes('lol-komandy') || ch.name.includes('lol-команды'));
         if (!channel) return message.reply('вќЊ РљР°РЅР°Р» РЅРµ РЅР°Р№РґРµРЅ!');
 
         await channel.delete().catch(() => {});
@@ -1991,12 +1991,12 @@ client.on('ready', () => {
             await postNewsToChannel(client);
         }
 
-        // рџЋ® LOL РЅРѕРІРѕСЃС‚Рё (РІ РєР°РЅР°Р» lol-РЅРѕРІРѕСЃС‚Рё)
+        // рџЋ® LOL РЅРѕРІРѕСЃС‚Рё (РІ РєР°РЅР°Р» lol-новости)
         if (newsHours.includes(currentHour)) {
             console.log('рџЋ® РћР±РЅРѕРІР»СЏСЋ LOL РЅРѕРІРѕСЃС‚Рё...');
             for (const [, guild] of client.guilds.cache) {
                 const lolNewsChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-РЅРѕРІРѕСЃС‚Рё') || ch.name.includes('lol-novosti')
+                    ch.name.includes('lol-новости') || ch.name.includes('lol-novosti')
                 );
                 if (lolNewsChannel) {
                     console.log('рџЋ® РљР°РЅР°Р» LOL РЅРѕРІРѕСЃС‚РµР№ РЅР°Р№РґРµРЅ:', lolNewsChannel.name);
@@ -2037,12 +2037,12 @@ client.on('ready', () => {
         }
 
 
-        // вљ”пёЏ LOL Tier List (РІ РєР°РЅР°Р» lol-РіР°Р№РґС‹)
+        // вљ”пёЏ LOL Tier List (РІ РєР°РЅР°Р» lol-гайды)
         if (tierListHours.includes(currentHour)) {
             console.log('вљ”пёЏ РћР±РЅРѕРІР»СЏСЋ LOL Tier List...');
             for (const [, guild] of client.guilds.cache) {
                 const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-РіР°Р№РґС‹') || ch.name.includes('lol-gajdy')
+                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
                 );
                 if (lolGuidesChannel) {
                     console.log('вљ”пёЏ РљР°РЅР°Р» РЅР°Р№РґРµРЅ:', lolGuidesChannel.name);
@@ -2051,12 +2051,12 @@ client.on('ready', () => {
             }
         }
 
-        // рџ›Ў LOL РЎР±РѕСЂРєРё (РІ РєР°РЅР°Р» lol-РіР°Р№РґС‹)
+        // рџ›Ў LOL РЎР±РѕСЂРєРё (РІ РєР°РЅР°Р» lol-гайды)
         if (buildsHours.includes(currentHour)) {
             console.log('рџ›Ў РћР±РЅРѕРІР»СЏСЋ LOL РЎР±РѕСЂРєРё...');
             for (const [, guild] of client.guilds.cache) {
                 const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-РіР°Р№РґС‹') || ch.name.includes('lol-gajdy')
+                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
                 );
                 if (lolGuidesChannel) {
                     console.log('рџ›Ў РљР°РЅР°Р» РЅР°Р№РґРµРЅ:', lolGuidesChannel.name);
@@ -2067,12 +2067,12 @@ client.on('ready', () => {
             }
         }
 
-        // рџЏ† LOL Р РµР№С‚РёРЅРі (РІ РєР°РЅР°Р» lol-РіР°Р№РґС‹)
+        // рџЏ† LOL Р РµР№С‚РёРЅРі (РІ РєР°РЅР°Р» lol-гайды)
         if (ratingHours.includes(currentHour)) {
             console.log('рџЏ† РћР±РЅРѕРІР»СЏСЋ LOL Р РµР№С‚РёРЅРі...');
             for (const [, guild] of client.guilds.cache) {
                 const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-РіР°Р№РґС‹') || ch.name.includes('lol-gajdy')
+                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
                 );
                 if (lolGuidesChannel) {
                     console.log('рџЏ† РљР°РЅР°Р» РЅР°Р№РґРµРЅ:', lolGuidesChannel.name);
@@ -2112,7 +2112,7 @@ client.on('guildMemberAdd', async (member) => {
             .setDescription(`РџСЂРёРІРµС‚, ${member}! Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ РЅР° СЃРµСЂРІРµСЂ **${member.guild.name}**!`)
             .addFields(
                 { name: 'рџЋ® РРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё', value: 'Р—Р°РіР»СЏРЅРё РІ РєР°РЅР°Р» **#рџЋ®-РЅРѕРІРѕСЃС‚Рё** вЂ” С‚Р°Рј РїРѕСЃР»РµРґРЅРёРµ РёРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё!', inline: false },
-                { name: 'вљ”пёЏ LOL Р“Р°Р№РґС‹', value: 'РРіСЂР°РµС€СЊ РІ LOL? РЎРјРѕС‚СЂРё **#вљ”пёЏ-lol-РіР°Р№РґС‹** вЂ” Tier List, СЃР±РѕСЂРєРё, СЂРµР№С‚РёРЅРіРё!', inline: false },
+                { name: 'вљ”пёЏ LOL Р“Р°Р№РґС‹', value: 'РРіСЂР°РµС€СЊ РІ LOL? РЎРјРѕС‚СЂРё **#вљ”пёЏ-lol-гайды** вЂ” Tier List, СЃР±РѕСЂРєРё, СЂРµР№С‚РёРЅРіРё!', inline: false },
                 { name: 'рџ“њ РљРѕРјР°РЅРґС‹', value: 'РќР°РїРёС€Рё `!help` С‡С‚РѕР±С‹ СѓР·РЅР°С‚СЊ РІСЃРµ РєРѕРјР°РЅРґС‹ Р±РѕС‚Р°!', inline: false },
                 { name: 'РЈС‡Р°СЃС‚РЅРёРєРѕРІ', value: `${member.guild.memberCount}`, inline: true },
                 { name: 'РЎРѕР·РґР°РЅ', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
