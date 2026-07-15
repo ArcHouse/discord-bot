@@ -2301,15 +2301,84 @@ setInterval(async () => {
 }, 10000);
 
 
-// ==================== HTTP HEALTHCHECK (для Render.com) ====================
+// ==================== HTTP HEALTHCHECK + NEWS ENDPOINTS (для Render.com) ====================
 const http = require('http');
-const server = http.createServer((req, res) => {
-    if (req.url === '/healthcheck' || req.url === '/') {
+const server = http.createServer(async (req, res) => {
+    const url = req.url.split('?')[0];
+
+    if (url === '/healthcheck' || url === '/') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('OK - Zohan Mimo Bot is running!');
+        return;
+    }
+
+    // Эндпоинты для публикации новостей (вызываются cron-job.org)
+    const endpoints = {
+        '/post/gaming-news': () => postNewsToChannel(client),
+        '/post/lol-news': async () => {
+            for (const [, guild] of client.guilds.cache) {
+                const ch = guild.channels.cache.find(c => c.name.includes('lol-новости') || c.name.includes('lol-novosti'));
+                if (ch) {
+                    const news = await fetchLoLNews();
+                    const embeds = [];
+                    for (const item of news) {
+                        const newsId = item.source + '-' + item.title;
+                        if (publishedLoLNews.has(newsId)) continue;
+                        const embed = new EmbedBuilder()
+                            .setColor(0xffd700)
+                            .setTitle(item.emoji + ' ' + item.title)
+                            .setDescription(item.content.substring(0, 400) + (item.content.length > 400 ? '...' : ''))
+                            .addFields({ name: 'Источник', value: item.source, inline: true })
+                            .setURL(item.link)
+                            .setTimestamp();
+                        if (item.image) { try { embed.setImage(item.image); } catch(e) {} }
+                        embeds.push(embed);
+                        publishedLoLNews.add(newsId);
+                    }
+                    for (let i = 0; i < embeds.length; i += 10) {
+                        await ch.send({ embeds: embeds.slice(i, i + 10) }).catch(() => {});
+                    }
+                }
+            }
+        },
+        '/post/tierlist': async () => {
+            for (const [, guild] of client.guilds.cache) {
+                const ch = guild.channels.cache.find(c => c.name.includes('lol-гайды') || c.name.includes('lol-gajdy'));
+                if (ch) await ch.send({ embeds: [createTierListEmbed()] }).catch(() => {});
+            }
+        },
+        '/post/builds': async () => {
+            for (const [, guild] of client.guilds.cache) {
+                const ch = guild.channels.cache.find(c => c.name.includes('lol-гайды') || c.name.includes('lol-gajdy'));
+                if (ch) {
+                    await ch.send({ embeds: createBuildsEmbed('mid') || [] }).catch(() => {});
+                    await new Promise(r => setTimeout(r, 2000));
+                    await ch.send({ embeds: createBuildsEmbed('adc') || [] }).catch(() => {});
+                }
+            }
+        },
+        '/post/rating': async () => {
+            for (const [, guild] of client.guilds.cache) {
+                const ch = guild.channels.cache.find(c => c.name.includes('lol-гайды') || c.name.includes('lol-gajdy'));
+                if (ch) await ch.send({ embeds: [createRatingEmbed()] }).catch(() => {});
+            }
+        }
+    };
+
+    if (endpoints[url]) {
+        try {
+            await endpoints[url]();
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('OK - Posted: ' + url);
+            console.log('📰 Cron triggered: ' + url);
+        } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end('Error: ' + err.message);
+            console.error('❌ Cron error:', url, err.message);
+        }
     } else {
-        res.writeHead(404);
-        res.end('Not found');
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not found. Available: /healthcheck, /post/gaming-news, /post/lol-news, /post/tierlist, /post/builds, /post/rating');
     }
 });
 const PORT = process.env.PORT || 3000;
