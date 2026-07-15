@@ -1,3 +1,4 @@
+const BOT_VERSION = 'v3.0.0-fixed-ru';
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
 const RSSParser = require('rss-parser');
 const TelegramBot = require('node-telegram-bot-api');
@@ -216,6 +217,7 @@ async function checkTwitchStreams(client) {
 
 // Хранилище опубликованных новостей (чтобы не дублировать)
 const publishedNews = new Set();
+const publishedLoLNews = new Set();
 
 // ==================== LOL ДАННЫЕ (OP.GG УРОВЕНЬ) ====================
 
@@ -2336,7 +2338,7 @@ const server = http.createServer(async (req, res) => {
 
     if (url === '/healthcheck' || url === '/') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('OK - Zohan Mimo Bot is running!');
+        res.end('OK - Zohan Mimo Bot is running! ' + BOT_VERSION);
         return;
     }
 
