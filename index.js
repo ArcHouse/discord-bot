@@ -1,16 +1,16 @@
-const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
+﻿const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
 const RSSParser = require('rss-parser');
 const TelegramBot = require('node-telegram-bot-api');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Антиспам хранилище
+// РђРЅС‚РёСЃРїР°Рј С…СЂР°РЅРёР»РёС‰Рµ
 const spamTracker = new Map();
 const SPAM_LIMIT = 30;
 const SPAM_TIME = 10000;
 
-// Настройка прокси если указан
+// РќР°СЃС‚СЂРѕР№РєР° РїСЂРѕРєСЃРё РµСЃР»Рё СѓРєР°Р·Р°РЅ
 const clientOptions = {
     intents: [
         GatewayIntentBits.Guilds,
@@ -22,7 +22,7 @@ const clientOptions = {
     ]
 };
 
-// Если указан прокси - добавляем поддержку
+// Р•СЃР»Рё СѓРєР°Р·Р°РЅ РїСЂРѕРєСЃРё - РґРѕР±Р°РІР»СЏРµРј РїРѕРґРґРµСЂР¶РєСѓ
 if (process.env.PROXY) {
     const { HttpsProxyAgent } = require('https-proxy-agent');
     const { SocksProxyAgent } = require('socks-proxy-agent');
@@ -34,36 +34,36 @@ if (process.env.PROXY) {
         agent = new HttpsProxyAgent(process.env.PROXY);
     }
     clientOptions.rest = { agent };
-    console.log(`🔗 Используется прокси: ${process.env.PROXY}`);
+    console.log(`рџ”— РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РїСЂРѕРєСЃРё: ${process.env.PROXY}`);
 }
 
 const client = new Client(clientOptions);
 
 // ==================== TELEGRAM BOT ====================
 
-// Telegram бот для связи Discord ↔ Telegram
+// Telegram Р±РѕС‚ РґР»СЏ СЃРІСЏР·Рё Discord в†” Telegram
 let telegramBot = null;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-// Функция отправки сообщения в Telegram
+// Р¤СѓРЅРєС†РёСЏ РѕС‚РїСЂР°РІРєРё СЃРѕРѕР±С‰РµРЅРёСЏ РІ Telegram
 async function sendToTelegram(message, fromDiscord = true) {
     if (!telegramBot || !TELEGRAM_CHAT_ID) return;
 
     try {
-        const prefix = fromDiscord ? '💬 Discord: ' : '';
+        const prefix = fromDiscord ? 'рџ’¬ Discord: ' : '';
         await telegramBot.sendMessage(TELEGRAM_CHAT_ID, prefix + message);
     } catch (err) {
-        console.log('⚠️ Telegram ошибка:', err.message);
+        console.log('вљ пёЏ Telegram РѕС€РёР±РєР°:', err.message);
     }
 }
 
-// Функция отправки embed в Telegram
+// Р¤СѓРЅРєС†РёСЏ РѕС‚РїСЂР°РІРєРё embed РІ Telegram
 async function sendEmbedToTelegram(embed, fromDiscord = true) {
     if (!telegramBot || !TELEGRAM_CHAT_ID) return;
 
     try {
-        const prefix = fromDiscord ? '💬 Discord:\n' : '';
+        const prefix = fromDiscord ? 'рџ’¬ Discord:\n' : '';
         let text = prefix + embed.title + '\n\n';
         if (embed.description) text += embed.description + '\n';
         if (embed.fields) {
@@ -73,66 +73,66 @@ async function sendEmbedToTelegram(embed, fromDiscord = true) {
         }
         await telegramBot.sendMessage(TELEGRAM_CHAT_ID, text.substring(0, 4000));
     } catch (err) {
-        console.log('⚠️ Telegram embed ошибка:', err.message);
+        console.log('вљ пёЏ Telegram embed РѕС€РёР±РєР°:', err.message);
     }
 }
 
-// ==================== ИГРОВЫЕ НОВОСТИ ====================
+// ==================== РР“Р РћР’Р«Р• РќРћР’РћРЎРўР ====================
 
 const rssParser = new RSSParser();
 
-// RSS-ленты игровых новостей (только рабочие!)
+// RSS-Р»РµРЅС‚С‹ РёРіСЂРѕРІС‹С… РЅРѕРІРѕСЃС‚РµР№ (С‚РѕР»СЊРєРѕ СЂР°Р±РѕС‡РёРµ!)
 const RSS_FEEDS = [
     {
         name: 'PC Gamer',
         url: 'https://www.pcgamer.com/rss/',
-        emoji: '🖥️'
+        emoji: 'рџ–ҐпёЏ'
     },
     {
         name: 'Eurogamer',
         url: 'https://www.eurogamer.net/feed',
-        emoji: '🎮'
+        emoji: 'рџЋ®'
     },
     {
         name: 'Rock Paper Shotgun',
         url: 'https://www.rockpapershotgun.com/feed',
-        emoji: '📰'
+        emoji: 'рџ“°'
     },
     {
         name: 'VG247',
         url: 'https://www.vg247.com/feed',
-        emoji: '🎯'
+        emoji: 'рџЋЇ'
     },
     {
         name: 'GamesIndustry',
         url: 'https://www.gamesindustry.biz/feed',
-        emoji: '📊'
+        emoji: 'рџ“Љ'
     }
 ];
 
-// LOL RSS-ленты (только LOL-специфичные источники)
+// LOL RSS-Р»РµРЅС‚С‹ (С‚РѕР»СЊРєРѕ LOL-СЃРїРµС†РёС„РёС‡РЅС‹Рµ РёСЃС‚РѕС‡РЅРёРєРё)
 const LOL_RSS_FEEDS = [
     {
         name: 'Surrender at 20',
         url: 'https://www.surrenderat20.net/feeds/posts/default?alt=rss',
-        emoji: '📰',
+        emoji: 'рџ“°',
         lolOnly: true
     },
     {
         name: 'LoL Esports',
         url: 'https://lolesports.com/rss',
-        emoji: '🏆',
+        emoji: 'рџЏ†',
         lolOnly: true
     },
     {
         name: 'LeagueFeed',
         url: 'https://www.leaguefeed.net/feed',
-        emoji: '🎮',
+        emoji: 'рџЋ®',
         lolOnly: true
     }
 ];
 
-// Ключевые слова LOL для фильтрации контента
+// РљР»СЋС‡РµРІС‹Рµ СЃР»РѕРІР° LOL РґР»СЏ С„РёР»СЊС‚СЂР°С†РёРё РєРѕРЅС‚РµРЅС‚Р°
 const LOL_KEYWORDS = [
     'league of legends', 'lol', 'riot', 'summoner', 'rift', 'champion', 'patch',
     'ARAM', 'summoners rift', 'ranked', 'diamond', 'emerald', 'platinum', 'gold',
@@ -146,53 +146,53 @@ const LOL_KEYWORDS = [
     'lcs', 'lec', 'lck', 'lpl', 'worlds', 'all star', 'mid season'
 ];
 
-// Проверка является ли текст о League of Legends
+// РџСЂРѕРІРµСЂРєР° СЏРІР»СЏРµС‚СЃСЏ Р»Рё С‚РµРєСЃС‚ Рѕ League of Legends
 function isLoLContent(title, content) {
     const text = (title + ' ' + content).toLowerCase();
     return LOL_KEYWORDS.some(keyword => text.includes(keyword.toLowerCase()));
 }
 
-// ==================== TWITCH УВЕДОМЛЕНИЯ ====================
+// ==================== TWITCH РЈР’Р•Р”РћРњР›Р•РќРРЇ ====================
 
-// Twitch каналы для отслеживания
+// Twitch РєР°РЅР°Р»С‹ РґР»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ
 const TWITCH_CHANNELS = [
     { name: 'BubaLeggg', login: 'bubaleggg' }
 ];
 
-// Хранилище статуса стримов
+// РҐСЂР°РЅРёР»РёС‰Рµ СЃС‚Р°С‚СѓСЃР° СЃС‚СЂРёРјРѕРІ
 const streamStatus = new Map();
 
-// Проверка стримов на Twitch
+// РџСЂРѕРІРµСЂРєР° СЃС‚СЂРёРјРѕРІ РЅР° Twitch
 async function checkTwitchStreams(client) {
     for (const channel of TWITCH_CHANNELS) {
         try {
-            // Используем публичный API для проверки статуса
+            // РСЃРїРѕР»СЊР·СѓРµРј РїСѓР±Р»РёС‡РЅС‹Р№ API РґР»СЏ РїСЂРѕРІРµСЂРєРё СЃС‚Р°С‚СѓСЃР°
             const url = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${channel.login}-320x180.jpg`;
             
-            // Проверяем через fetch
+            // РџСЂРѕРІРµСЂСЏРµРј С‡РµСЂРµР· fetch
             const response = await fetch(url, { method: 'HEAD' });
             const isLive = response.ok;
             
             const wasLive = streamStatus.get(channel.login) || false;
             
-            // Если стрим начался
+            // Р•СЃР»Рё СЃС‚СЂРёРј РЅР°С‡Р°Р»СЃСЏ
             if (isLive && !wasLive) {
-                console.log(`🔴 ${channel.name} начал стрим!`);
+                console.log(`рџ”ґ ${channel.name} РЅР°С‡Р°Р» СЃС‚СЂРёРј!`);
                 
-                // Ищем канал объявления
+                // РС‰РµРј РєР°РЅР°Р» РѕР±СЉСЏРІР»РµРЅРёСЏ
                 for (const [, guild] of client.guilds.cache) {
                     const announceChannel = guild.channels.cache.find(ch => 
-                        ch.name.includes('объявления') || ch.name.includes('announce')
+                        ch.name.includes('РѕР±СЉСЏРІР»РµРЅРёСЏ') || ch.name.includes('announce')
                     );
                     if (announceChannel) {
                         await announceChannel.send({ embeds: [
                             new EmbedBuilder()
                                 .setColor(0x9146ff)
-                                .setTitle('🔴 СТРИМ НАЧАЛСЯ!')
-                                .setDescription(`**${channel.name}** начал прямую трансляцию!`)
+                                .setTitle('рџ”ґ РЎРўР РРњ РќРђР§РђР›РЎРЇ!')
+                                .setDescription(`**${channel.name}** РЅР°С‡Р°Р» РїСЂСЏРјСѓСЋ С‚СЂР°РЅСЃР»СЏС†РёСЋ!`)
                                 .addFields(
-                                    { name: '📺 Канал', value: `https://twitch.tv/${channel.login}`, inline: true },
-                                    { name: '🎮 Игра', value: 'League of Legends', inline: true }
+                                    { name: 'рџ“є РљР°РЅР°Р»', value: `https://twitch.tv/${channel.login}`, inline: true },
+                                    { name: 'рџЋ® РРіСЂР°', value: 'League of Legends', inline: true }
                                 )
                                 .setThumbnail(`https://static-cdn.jtvnw.net/jtv_user_pictures/${channel.login}-profile_image-70x70.png`)
                                 .setTimestamp()
@@ -201,23 +201,24 @@ async function checkTwitchStreams(client) {
                 }
             }
             
-            // Если стрим закончился
+            // Р•СЃР»Рё СЃС‚СЂРёРј Р·Р°РєРѕРЅС‡РёР»СЃСЏ
             if (!isLive && wasLive) {
-                console.log(`⚫ ${channel.name} закончил стрим`);
+                console.log(`вљ« ${channel.name} Р·Р°РєРѕРЅС‡РёР» СЃС‚СЂРёРј`);
             }
             
             streamStatus.set(channel.login, isLive);
             
         } catch (err) {
-            console.log('⚠️ Twitch ошибка:', err.message.substring(0, 50));
+            console.log('вљ пёЏ Twitch РѕС€РёР±РєР°:', err.message.substring(0, 50));
         }
     }
 }
 
-// Хранилище опубликованных новостей (чтобы не дублировать)
+// РҐСЂР°РЅРёР»РёС‰Рµ РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… РЅРѕРІРѕСЃС‚РµР№ (С‡С‚РѕР±С‹ РЅРµ РґСѓР±Р»РёСЂРѕРІР°С‚СЊ)
 const publishedNews = new Set();
+const publishedLoLNews = new Set();
 
-// ==================== LOL ДАННЫЕ (OP.GG УРОВЕНЬ) ====================
+// ==================== LOL Р”РђРќРќР«Р• (OP.GG РЈР РћР’Р•РќР¬) ====================
 
 // Tier List
 const LOL_TIER_LIST = {
@@ -227,53 +228,53 @@ const LOL_TIER_LIST = {
     B: ['Malphite', 'Shen', 'Ornn', 'Diana', 'Lissandra']
 };
 
-// Реальная статистика чемпионов с OP.GG
+// Р РµР°Р»СЊРЅР°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР° С‡РµРјРїРёРѕРЅРѕРІ СЃ OP.GG
 const LOL_CHAMPIONS = {
-    // МИД
+    // РњРР”
     mid: [
-        { name: 'Ahri', winRate: '51.01%', pickRate: '9.02%', banRate: '3.13%', tier: 'S', rune: 'Тайный огонь', items: ['Луден', 'Светлячок', 'Бездонная маска'] },
-        { name: 'Syndra', winRate: '50.88%', pickRate: '7.46%', banRate: '4.73%', tier: 'S', rune: 'Электрошок', items: ['Луден', 'Чертоги', 'Сфера Void'] },
-        { name: 'Viktor', winRate: '50.42%', pickRate: '8.62%', banRate: '8.16%', tier: 'A', rune: 'Электрошок', items: ['Луден', 'Чертоги', 'Бездонная маска'] },
-        { name: 'Xerath', winRate: '51.65%', pickRate: '4.61%', banRate: '8.07%', tier: 'S', rune: 'Электрошок', items: ['Луден', 'Светлячок', 'Чертоги'] },
-        { name: 'Fizz', winRate: '51.56%', pickRate: '5.22%', banRate: '6.37%', tier: 'S', rune: 'Электрошок', items: ['Луден', 'Пламя Рыцаря', 'Бездонная маска'] },
-        { name: 'Katarina', winRate: '51.15%', pickRate: '6.82%', banRate: '9.99%', tier: 'S', rune: 'Электрошок', items: ['Луден', 'Пламя Рыцаря', 'Бездонная маска'] },
-        { name: 'Diana', winRate: '51.47%', pickRate: '4.36%', banRate: '4.87%', tier: 'A', rune: 'Электрошок', items: ['Луден', 'Пламя Рыцаря', 'Бездонная маска'] },
-        { name: 'Lissandra', winRate: '51.12%', pickRate: '5.1%', banRate: '3.05%', tier: 'A', rune: 'Электрошок', items: ['Луден', 'Светлячок', 'Бездонная маска'] }
+        { name: 'Ahri', winRate: '51.01%', pickRate: '9.02%', banRate: '3.13%', tier: 'S', rune: 'РўР°Р№РЅС‹Р№ РѕРіРѕРЅСЊ', items: ['Р›СѓРґРµРЅ', 'РЎРІРµС‚Р»СЏС‡РѕРє', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°'] },
+        { name: 'Syndra', winRate: '50.88%', pickRate: '7.46%', banRate: '4.73%', tier: 'S', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р›СѓРґРµРЅ', 'Р§РµСЂС‚РѕРіРё', 'РЎС„РµСЂР° Void'] },
+        { name: 'Viktor', winRate: '50.42%', pickRate: '8.62%', banRate: '8.16%', tier: 'A', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р›СѓРґРµРЅ', 'Р§РµСЂС‚РѕРіРё', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°'] },
+        { name: 'Xerath', winRate: '51.65%', pickRate: '4.61%', banRate: '8.07%', tier: 'S', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р›СѓРґРµРЅ', 'РЎРІРµС‚Р»СЏС‡РѕРє', 'Р§РµСЂС‚РѕРіРё'] },
+        { name: 'Fizz', winRate: '51.56%', pickRate: '5.22%', banRate: '6.37%', tier: 'S', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р›СѓРґРµРЅ', 'РџР»Р°РјСЏ Р С‹С†Р°СЂСЏ', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°'] },
+        { name: 'Katarina', winRate: '51.15%', pickRate: '6.82%', banRate: '9.99%', tier: 'S', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р›СѓРґРµРЅ', 'РџР»Р°РјСЏ Р С‹С†Р°СЂСЏ', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°'] },
+        { name: 'Diana', winRate: '51.47%', pickRate: '4.36%', banRate: '4.87%', tier: 'A', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р›СѓРґРµРЅ', 'РџР»Р°РјСЏ Р С‹С†Р°СЂСЏ', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°'] },
+        { name: 'Lissandra', winRate: '51.12%', pickRate: '5.1%', banRate: '3.05%', tier: 'A', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р›СѓРґРµРЅ', 'РЎРІРµС‚Р»СЏС‡РѕРє', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°'] }
     ],
     // ADC
     adc: [
-        { name: 'Jinx', winRate: '51.97%', pickRate: '11.42%', banRate: '2.25%', tier: 'S+', rune: 'Фатальная скорость', items: ['Клятва Крушителя', 'Танцующий меч', 'Бесконечный голод'] },
-        { name: 'Senna', winRate: '53.4%', pickRate: '8.89%', banRate: '22.19%', tier: 'S+', rune: 'Клятва', items: ['Клятва Крушителя', 'Доминик', 'Смертельный танец'] },
-        { name: 'Tristana', winRate: '51.32%', pickRate: '7.17%', banRate: '2.53%', tier: 'A', rune: 'Фатальная скорость', items: ['Клятва Крушителя', 'Танцующий меч', 'Бесконечный голод'] },
-        { name: 'Seraphine', winRate: '53.89%', pickRate: '3.02%', banRate: '11.62%', tier: 'S+', rune: 'Электрошок', items: ['Луден', 'Светлячок', 'Бездонная маска'] }
+        { name: 'Jinx', winRate: '51.97%', pickRate: '11.42%', banRate: '2.25%', tier: 'S+', rune: 'Р¤Р°С‚Р°Р»СЊРЅР°СЏ СЃРєРѕСЂРѕСЃС‚СЊ', items: ['РљР»СЏС‚РІР° РљСЂСѓС€РёС‚РµР»СЏ', 'РўР°РЅС†СѓСЋС‰РёР№ РјРµС‡', 'Р‘РµСЃРєРѕРЅРµС‡РЅС‹Р№ РіРѕР»РѕРґ'] },
+        { name: 'Senna', winRate: '53.4%', pickRate: '8.89%', banRate: '22.19%', tier: 'S+', rune: 'РљР»СЏС‚РІР°', items: ['РљР»СЏС‚РІР° РљСЂСѓС€РёС‚РµР»СЏ', 'Р”РѕРјРёРЅРёРє', 'РЎРјРµСЂС‚РµР»СЊРЅС‹Р№ С‚Р°РЅРµС†'] },
+        { name: 'Tristana', winRate: '51.32%', pickRate: '7.17%', banRate: '2.53%', tier: 'A', rune: 'Р¤Р°С‚Р°Р»СЊРЅР°СЏ СЃРєРѕСЂРѕСЃС‚СЊ', items: ['РљР»СЏС‚РІР° РљСЂСѓС€РёС‚РµР»СЏ', 'РўР°РЅС†СѓСЋС‰РёР№ РјРµС‡', 'Р‘РµСЃРєРѕРЅРµС‡РЅС‹Р№ РіРѕР»РѕРґ'] },
+        { name: 'Seraphine', winRate: '53.89%', pickRate: '3.02%', banRate: '11.62%', tier: 'S+', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р›СѓРґРµРЅ', 'РЎРІРµС‚Р»СЏС‡РѕРє', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°'] }
     ],
-    // ПОДДЕРЖКА
+    // РџРћР”Р”Р•Р Р–РљРђ
     support: [
-        { name: 'Thresh', winRate: '51.85%', pickRate: '13.54%', banRate: '8.09%', tier: 'S+', rune: 'Запредельная скорость', items: ['Зимняя гора', 'Запредельная сила', 'Воздаятель'] },
-        { name: 'Leona', winRate: '52.12%', pickRate: '7.49%', banRate: '6.85%', tier: 'S', rune: 'Афера', items: ['Зимняя гора', 'Запредельная сила', 'Медальон'] },
-        { name: 'Nautilus', winRate: '50.47%', pickRate: '10.47%', banRate: '13.89%', tier: 'A', rune: 'Афера', items: ['Зимняя гора', 'Запредельная сила', 'Медальон'] },
-        { name: 'Braum', winRate: '51.86%', pickRate: '4.54%', banRate: '5.5%', tier: 'A', rune: 'Афера', items: ['Зимняя гора', 'Запредельная сила', 'Медальон'] },
-        { name: 'Sona', winRate: '52.05%', pickRate: '3%', banRate: '0.2%', tier: 'A', rune: 'Электрошок', items: ['Зимняя гора', 'Запредельная сила', 'Медальон'] }
+        { name: 'Thresh', winRate: '51.85%', pickRate: '13.54%', banRate: '8.09%', tier: 'S+', rune: 'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРєРѕСЂРѕСЃС‚СЊ', items: ['Р—РёРјРЅСЏСЏ РіРѕСЂР°', 'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°', 'Р’РѕР·РґР°СЏС‚РµР»СЊ'] },
+        { name: 'Leona', winRate: '52.12%', pickRate: '7.49%', banRate: '6.85%', tier: 'S', rune: 'РђС„РµСЂР°', items: ['Р—РёРјРЅСЏСЏ РіРѕСЂР°', 'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°', 'РњРµРґР°Р»СЊРѕРЅ'] },
+        { name: 'Nautilus', winRate: '50.47%', pickRate: '10.47%', banRate: '13.89%', tier: 'A', rune: 'РђС„РµСЂР°', items: ['Р—РёРјРЅСЏСЏ РіРѕСЂР°', 'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°', 'РњРµРґР°Р»СЊРѕРЅ'] },
+        { name: 'Braum', winRate: '51.86%', pickRate: '4.54%', banRate: '5.5%', tier: 'A', rune: 'РђС„РµСЂР°', items: ['Р—РёРјРЅСЏСЏ РіРѕСЂР°', 'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°', 'РњРµРґР°Р»СЊРѕРЅ'] },
+        { name: 'Sona', winRate: '52.05%', pickRate: '3%', banRate: '0.2%', tier: 'A', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р—РёРјРЅСЏСЏ РіРѕСЂР°', 'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°', 'РњРµРґР°Р»СЊРѕРЅ'] }
     ],
-    // ДЖУНГЛЬ
+    // Р”Р–РЈРќР“Р›Р¬
     jungle: [
-        { name: 'Nasus', winRate: '53.12%', pickRate: '3.57%', banRate: '7.1%', tier: 'S+', rune: 'Градиент', items: ['Джунгл предмет', 'Черный топор', 'Костяной щит'] },
-        { name: 'Nocturne', winRate: '51.57%', pickRate: '7.23%', banRate: '12.87%', tier: 'S', rune: 'Электрошок', items: ['Джунгл предмет', 'Клятва', 'Клинок'] },
-        { name: 'Wukong', winRate: '51.98%', pickRate: '5.79%', banRate: '1.97%', tier: 'S', rune: 'Электрошок', items: ['Джунгл предмет', 'Клятва', 'Клинок'] },
-        { name: 'Briar', winRate: '51.67%', pickRate: '4.91%', banRate: '8.23%', tier: 'A', rune: 'Электрошок', items: ['Джунгл предмет', 'Клятва', 'Клинок'] },
-        { name: 'Sylas', winRate: '50.46%', pickRate: '8.48%', banRate: '18.66%', tier: 'A', rune: 'Электрошок', items: ['Джунгл предмет', 'Луден', 'Бездонная маска'] }
+        { name: 'Nasus', winRate: '53.12%', pickRate: '3.57%', banRate: '7.1%', tier: 'S+', rune: 'Р“СЂР°РґРёРµРЅС‚', items: ['Р”Р¶СѓРЅРіР» РїСЂРµРґРјРµС‚', 'Р§РµСЂРЅС‹Р№ С‚РѕРїРѕСЂ', 'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚'] },
+        { name: 'Nocturne', winRate: '51.57%', pickRate: '7.23%', banRate: '12.87%', tier: 'S', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р”Р¶СѓРЅРіР» РїСЂРµРґРјРµС‚', 'РљР»СЏС‚РІР°', 'РљР»РёРЅРѕРє'] },
+        { name: 'Wukong', winRate: '51.98%', pickRate: '5.79%', banRate: '1.97%', tier: 'S', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р”Р¶СѓРЅРіР» РїСЂРµРґРјРµС‚', 'РљР»СЏС‚РІР°', 'РљР»РёРЅРѕРє'] },
+        { name: 'Briar', winRate: '51.67%', pickRate: '4.91%', banRate: '8.23%', tier: 'A', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р”Р¶СѓРЅРіР» РїСЂРµРґРјРµС‚', 'РљР»СЏС‚РІР°', 'РљР»РёРЅРѕРє'] },
+        { name: 'Sylas', winRate: '50.46%', pickRate: '8.48%', banRate: '18.66%', tier: 'A', rune: 'Р­Р»РµРєС‚СЂРѕС€РѕРє', items: ['Р”Р¶СѓРЅРіР» РїСЂРµРґРјРµС‚', 'Р›СѓРґРµРЅ', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°'] }
     ],
-    // ТОП
+    // РўРћРџ
     top: [
-        { name: 'Garen', winRate: '51.76%', pickRate: '8.16%', banRate: '6.9%', tier: 'S', rune: 'Конкистадор', items: ['Черный топор', 'Костяной щит', 'Медальон'] },
-        { name: 'Malphite', winRate: '51.34%', pickRate: '7.01%', banRate: '17.88%', tier: 'S', rune: 'Афера', items: ['Ледяной шлем', 'Платье Рыцаря', 'Костяной щит'] },
-        { name: 'Kayle', winRate: '52.02%', pickRate: '2.52%', banRate: '2.34%', tier: 'A', rune: 'Конкистадор', items: ['Черный топор', 'Костяной щит', 'Медальон'] },
-        { name: 'Shen', winRate: '51.65%', pickRate: '4.02%', banRate: '0.95%', tier: 'A', rune: 'Афера', items: ['Зимняя гора', 'Запредельная сила', 'Костяной щит'] },
-        { name: 'Ornn', winRate: '51.33%', pickRate: '3.79%', banRate: '0.61%', tier: 'A', rune: 'Афера', items: ['Зимняя гора', 'Запредельная сила', 'Костяной щит'] }
+        { name: 'Garen', winRate: '51.76%', pickRate: '8.16%', banRate: '6.9%', tier: 'S', rune: 'РљРѕРЅРєРёСЃС‚Р°РґРѕСЂ', items: ['Р§РµСЂРЅС‹Р№ С‚РѕРїРѕСЂ', 'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚', 'РњРµРґР°Р»СЊРѕРЅ'] },
+        { name: 'Malphite', winRate: '51.34%', pickRate: '7.01%', banRate: '17.88%', tier: 'S', rune: 'РђС„РµСЂР°', items: ['Р›РµРґСЏРЅРѕР№ С€Р»РµРј', 'РџР»Р°С‚СЊРµ Р С‹С†Р°СЂСЏ', 'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚'] },
+        { name: 'Kayle', winRate: '52.02%', pickRate: '2.52%', banRate: '2.34%', tier: 'A', rune: 'РљРѕРЅРєРёСЃС‚Р°РґРѕСЂ', items: ['Р§РµСЂРЅС‹Р№ С‚РѕРїРѕСЂ', 'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚', 'РњРµРґР°Р»СЊРѕРЅ'] },
+        { name: 'Shen', winRate: '51.65%', pickRate: '4.02%', banRate: '0.95%', tier: 'A', rune: 'РђС„РµСЂР°', items: ['Р—РёРјРЅСЏСЏ РіРѕСЂР°', 'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°', 'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚'] },
+        { name: 'Ornn', winRate: '51.33%', pickRate: '3.79%', banRate: '0.61%', tier: 'A', rune: 'РђС„РµСЂР°', items: ['Р—РёРјРЅСЏСЏ РіРѕСЂР°', 'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°', 'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚'] }
     ]
 };
 
-// Картинки чемпионов (Riot Data Dragon - работает!)
+// РљР°СЂС‚РёРЅРєРё С‡РµРјРїРёРѕРЅРѕРІ (Riot Data Dragon - СЂР°Р±РѕС‚Р°РµС‚!)
 function getChampionImage(championName) {
     const champId = {
         'Ahri': 'Ahri', 'Syndra': 'Syndra', 'Viktor': 'Viktor', 'Xerath': 'Xerath',
@@ -287,40 +288,40 @@ function getChampionImage(championName) {
     return `https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/${id}.png`;
 }
 
-// Картинки предметов (Riot Data Dragon)
+// РљР°СЂС‚РёРЅРєРё РїСЂРµРґРјРµС‚РѕРІ (Riot Data Dragon)
 function getItemImage(itemName) {
     const items = {
-        'Луден': '3285',        // Luden's Tempest
-        'Светлячок': '4628',    // Horizon Focus
-        'Бездонная маска': '4645', // Shadowflame
-        'Чертоги': '4637',      // Cryptbloom
-        'Сфера Void': '3135',   // Void Staff
-        'Пламя Рыцаря': '3142', // Youmuu's Ghostblade
-        'Клятва Крушителя': '3153', // Immortal Shieldbow
-        'Танцующий меч': '3124', // Guinsoo's Rageblade
-        'Бесконечный голод': '3031', // Infinity Edge
-        'Доминик': '3036',      // Lord Dominik's Regards
-        'Смертельный танец': '3156', // Death's Dance
-        'Зимняя гора': '3857',  // Steel Shoulderguards
-        'Запредельная сила': '3190', // Locket of the Iron Solari
-        'Воздаятель': '3107',   // Redemption
-        'Медальон': '3190',     // Locket
-        'Черный топор': '3071', // Black Cleaver
-        'Костяной щит': '3068', // Sunfire Aegis
-        'Джунгл предмет': '1101', // Hailblade
-        'Клятва': '3153',       // Immortal Shieldbow
-        'Клинок': '3134',       // Serrated Dirk
-        'Ледяной шлем': '3116', // Rylai's Crystal Scepter
-        'Платье Рыцаря': '3157' // Zhonya's Hourglass
+        'Р›СѓРґРµРЅ': '3285',        // Luden's Tempest
+        'РЎРІРµС‚Р»СЏС‡РѕРє': '4628',    // Horizon Focus
+        'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°': '4645', // Shadowflame
+        'Р§РµСЂС‚РѕРіРё': '4637',      // Cryptbloom
+        'РЎС„РµСЂР° Void': '3135',   // Void Staff
+        'РџР»Р°РјСЏ Р С‹С†Р°СЂСЏ': '3142', // Youmuu's Ghostblade
+        'РљР»СЏС‚РІР° РљСЂСѓС€РёС‚РµР»СЏ': '3153', // Immortal Shieldbow
+        'РўР°РЅС†СѓСЋС‰РёР№ РјРµС‡': '3124', // Guinsoo's Rageblade
+        'Р‘РµСЃРєРѕРЅРµС‡РЅС‹Р№ РіРѕР»РѕРґ': '3031', // Infinity Edge
+        'Р”РѕРјРёРЅРёРє': '3036',      // Lord Dominik's Regards
+        'РЎРјРµСЂС‚РµР»СЊРЅС‹Р№ С‚Р°РЅРµС†': '3156', // Death's Dance
+        'Р—РёРјРЅСЏСЏ РіРѕСЂР°': '3857',  // Steel Shoulderguards
+        'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°': '3190', // Locket of the Iron Solari
+        'Р’РѕР·РґР°СЏС‚РµР»СЊ': '3107',   // Redemption
+        'РњРµРґР°Р»СЊРѕРЅ': '3190',     // Locket
+        'Р§РµСЂРЅС‹Р№ С‚РѕРїРѕСЂ': '3071', // Black Cleaver
+        'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚': '3068', // Sunfire Aegis
+        'Р”Р¶СѓРЅРіР» РїСЂРµРґРјРµС‚': '1101', // Hailblade
+        'РљР»СЏС‚РІР°': '3153',       // Immortal Shieldbow
+        'РљР»РёРЅРѕРє': '3134',       // Serrated Dirk
+        'Р›РµРґСЏРЅРѕР№ С€Р»РµРј': '3116', // Rylai's Crystal Scepter
+        'РџР»Р°С‚СЊРµ Р С‹С†Р°СЂСЏ': '3157' // Zhonya's Hourglass
     };
     const itemId = items[itemName] || '1001'; // Default boot if not found
     return `https://ddragon.leagueoflegends.com/cdn/16.13.1/img/item/${itemId}.png`;
 }
 
-// ТIER EMOJI
+// РўIER EMOJI
 function getTierEmoji(tier) {
-    const emojis = { 'S+': '🏆', 'S': '🥇', 'A': '🥈', 'B': '🥉', 'C': '📊' };
-    return emojis[tier] || '📊';
+    const emojis = { 'S+': 'рџЏ†', 'S': 'рџҐ‡', 'A': 'рџҐ€', 'B': 'рџҐ‰', 'C': 'рџ“Љ' };
+    return emojis[tier] || 'рџ“Љ';
 }
 
 // TIER COLOR
@@ -329,73 +330,73 @@ function getTierColor(tier) {
     return colors[tier] || 0x5865f2;
 }
 
-// Создание Tier List embed (КРАСИВО С КАРТИНКАМИ)
+// РЎРѕР·РґР°РЅРёРµ Tier List embed (РљР РђРЎРР’Рћ РЎ РљРђР РўРРќРљРђРњР)
 function createTierListEmbed() {
     const embed = new EmbedBuilder()
         .setColor(0xffd700)
-        .setTitle('📊 TIER LIST — Патч 16.13')
-        .setDescription('**Рейтинг чемпионов по тирам** (Emerald+)\n\nДанные: OP.GG | 38.6M анализов')
+        .setTitle('рџ“Љ TIER LIST вЂ” РџР°С‚С‡ 16.13')
+        .setDescription('**Р РµР№С‚РёРЅРі С‡РµРјРїРёРѕРЅРѕРІ РїРѕ С‚РёСЂР°Рј** (Emerald+)\n\nР”Р°РЅРЅС‹Рµ: OP.GG | 38.6M Р°РЅР°Р»РёР·РѕРІ')
         .setImage('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png')
-        .setFooter({ text: 'Обновляется каждую неделю | Данные: OP.GG' })
+        .setFooter({ text: 'РћР±РЅРѕРІР»СЏРµС‚СЃСЏ РєР°Р¶РґСѓСЋ РЅРµРґРµР»СЋ | Р”Р°РЅРЅС‹Рµ: OP.GG' })
         .setTimestamp();
 
-    // Добавляем тиры с картинками
+    // Р”РѕР±Р°РІР»СЏРµРј С‚РёСЂС‹ СЃ РєР°СЂС‚РёРЅРєР°РјРё
     for (const [tier, champs] of Object.entries(LOL_TIER_LIST)) {
         const tierName = tier.replace('_', '+');
         const emoji = getTierEmoji(tierName);
         const value = champs.map(c => `${emoji} **${c}**`).join('\n');
-        embed.addFields({ name: `━━━ ${tierName} TIER ━━━`, value, inline: true });
+        embed.addFields({ name: `в”Ѓв”Ѓв”Ѓ ${tierName} TIER в”Ѓв”Ѓв”Ѓ`, value, inline: true });
     }
 
     return embed;
 }
 
-// Создание embed для ТОП по позициям
+// РЎРѕР·РґР°РЅРёРµ embed РґР»СЏ РўРћРџ РїРѕ РїРѕР·РёС†РёСЏРј
 function createTopChampionsEmbed(position) {
-    const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
-    const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
+    const positionNames = { mid: 'РњРёРґ', adc: 'ADC', support: 'РџРѕРґРґРµСЂР¶РєР°', jungle: 'Р”Р¶СѓРЅРіР»СЊ', top: 'РўРѕРї' };
+    const positionEmojis = { mid: 'вљ”пёЏ', adc: 'рџЏ№', support: 'рџ›Ў', jungle: 'рџ—Ў', top: 'рџ›Ў' };
     const champions = LOL_CHAMPIONS[position];
 
     if (!champions) return null;
 
     const itemEmojis = {
-        'Луден': '🟣', 'Светлячок': '🔵', 'Бездонная маска': '🟠',
-        'Чертоги': '🟢', 'Сфера Void': '🔴', 'Пламя Рыцаря': '🟤',
-        'Клятва Крушителя': '🟡', 'Танцующий меч': '⚪', 'Бесконечный голод': '🔵',
-        'Доминик': '🔴', 'Смертельный танец': '⚫', 'Зимняя гора': '🟣',
-        'Запредельная сила': '🟢', 'Воздаятель': '🔵', 'Медальон': '🟤',
-        'Черный топор': '⚫', 'Костяной щит': '🟡', 'Джунгл предмет': '🟣',
-        'Клятва': '🟡', 'Клинок': '⚪', 'Ледяной шлем': '🔵', 'Платье Рыцаря': '🟠'
+        'Р›СѓРґРµРЅ': 'рџџЈ', 'РЎРІРµС‚Р»СЏС‡РѕРє': 'рџ”µ', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°': 'рџџ ',
+        'Р§РµСЂС‚РѕРіРё': 'рџџў', 'РЎС„РµСЂР° Void': 'рџ”ґ', 'РџР»Р°РјСЏ Р С‹С†Р°СЂСЏ': 'рџџ¤',
+        'РљР»СЏС‚РІР° РљСЂСѓС€РёС‚РµР»СЏ': 'рџџЎ', 'РўР°РЅС†СѓСЋС‰РёР№ РјРµС‡': 'вљЄ', 'Р‘РµСЃРєРѕРЅРµС‡РЅС‹Р№ РіРѕР»РѕРґ': 'рџ”µ',
+        'Р”РѕРјРёРЅРёРє': 'рџ”ґ', 'РЎРјРµСЂС‚РµР»СЊРЅС‹Р№ С‚Р°РЅРµС†': 'вљ«', 'Р—РёРјРЅСЏСЏ РіРѕСЂР°': 'рџџЈ',
+        'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°': 'рџџў', 'Р’РѕР·РґР°СЏС‚РµР»СЊ': 'рџ”µ', 'РњРµРґР°Р»СЊРѕРЅ': 'рџџ¤',
+        'Р§РµСЂРЅС‹Р№ С‚РѕРїРѕСЂ': 'вљ«', 'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚': 'рџџЎ', 'Р”Р¶СѓРЅРіР» РїСЂРµРґРјРµС‚': 'рџџЈ',
+        'РљР»СЏС‚РІР°': 'рџџЎ', 'РљР»РёРЅРѕРє': 'вљЄ', 'Р›РµРґСЏРЅРѕР№ С€Р»РµРј': 'рџ”µ', 'РџР»Р°С‚СЊРµ Р С‹С†Р°СЂСЏ': 'рџџ '
     };
 
     const embeds = [];
 
-    // Главный embed
+    // Р“Р»Р°РІРЅС‹Р№ embed
     const mainEmbed = new EmbedBuilder()
         .setColor(0x1a1a2e)
-        .setTitle(`${positionEmojis[position]} ТОП ЧЕМПИОНОВ — ${positionNames[position]}`)
-        .setDescription('**Лучшие чемпионы по Win Rate** (Emerald+)')
-        .setFooter({ text: 'Данные: OP.GG | Патч 16.13' })
+        .setTitle(`${positionEmojis[position]} РўРћРџ Р§Р•РњРџРРћРќРћР’ вЂ” ${positionNames[position]}`)
+        .setDescription('**Р›СѓС‡С€РёРµ С‡РµРјРїРёРѕРЅС‹ РїРѕ Win Rate** (Emerald+)')
+        .setFooter({ text: 'Р”Р°РЅРЅС‹Рµ: OP.GG | РџР°С‚С‡ 16.13' })
         .setTimestamp();
     embeds.push(mainEmbed);
 
-    // Каждый чемпион
+    // РљР°Р¶РґС‹Р№ С‡РµРјРїРёРѕРЅ
     for (let i = 0; i < Math.min(champions.length, 5); i++) {
         const champ = champions[i];
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+        const medal = i === 0 ? 'рџҐ‡' : i === 1 ? 'рџҐ€' : i === 2 ? 'рџҐ‰' : `${i + 1}.`;
 
         const itemsText = champ.items.map(item => {
-            const emoji = itemEmojis[item] || '⬛';
+            const emoji = itemEmojis[item] || 'в¬›';
             return `${emoji} ${item}`;
-        }).join(' → ');
+        }).join(' в†’ ');
 
         const champEmbed = new EmbedBuilder()
             .setColor(0x1a1a2e)
-            .setTitle(`${medal} ${champ.name} — ${champ.tier} Tier`)
+            .setTitle(`${medal} ${champ.name} вЂ” ${champ.tier} Tier`)
             .setDescription(`**Win Rate:** ${champ.winRate} | **Pick Rate:** ${champ.pickRate} | **Ban Rate:** ${champ.banRate}`)
             .addFields(
-                { name: '🔮 Руна', value: champ.rune, inline: true },
-                { name: '🛡 Сборка', value: itemsText, inline: false }
+                { name: 'рџ”® Р СѓРЅР°', value: champ.rune, inline: true },
+                { name: 'рџ›Ў РЎР±РѕСЂРєР°', value: itemsText, inline: false }
             )
             .setThumbnail(getChampionImage(champ.name));
         embeds.push(champEmbed);
@@ -404,31 +405,31 @@ function createTopChampionsEmbed(position) {
     return embeds;
 }
 
-// Создание сборок embed
+// РЎРѕР·РґР°РЅРёРµ СЃР±РѕСЂРѕРє embed
 function createBuildsEmbed(position) {
     const champions = LOL_CHAMPIONS[position];
     if (!champions) return null;
 
-    const positionNames = { mid: 'Мид', adc: 'ADC', support: 'Поддержка', jungle: 'Джунгль', top: 'Топ' };
-    const positionEmojis = { mid: '⚔️', adc: '🏹', support: '🛡', jungle: '🗡', top: '🛡' };
+    const positionNames = { mid: 'РњРёРґ', adc: 'ADC', support: 'РџРѕРґРґРµСЂР¶РєР°', jungle: 'Р”Р¶СѓРЅРіР»СЊ', top: 'РўРѕРї' };
+    const positionEmojis = { mid: 'вљ”пёЏ', adc: 'рџЏ№', support: 'рџ›Ў', jungle: 'рџ—Ў', top: 'рџ›Ў' };
 
     const itemEmojis = {
-        'Луден': '🟣', 'Светлячок': '🔵', 'Бездонная маска': '🟠',
-        'Чертоги': '🟢', 'Сфера Void': '🔴', 'Пламя Рыцаря': '🟤',
-        'Клятва Крушителя': '🟡', 'Танцующий меч': '⚪', 'Бесконечный голод': '🔵',
-        'Доминик': '🔴', 'Смертельный танец': '⚫', 'Зимняя гора': '🟣',
-        'Запредельная сила': '🟢', 'Воздаятель': '🔵', 'Медальон': '🟤',
-        'Черный топор': '⚫', 'Костяной щит': '🟡', 'Джунгл предмет': '🟣',
-        'Клятва': '🟡', 'Клинок': '⚪', 'Ледяной шлем': '🔵', 'Платье Рыцаря': '🟠'
+        'Р›СѓРґРµРЅ': 'рџџЈ', 'РЎРІРµС‚Р»СЏС‡РѕРє': 'рџ”µ', 'Р‘РµР·РґРѕРЅРЅР°СЏ РјР°СЃРєР°': 'рџџ ',
+        'Р§РµСЂС‚РѕРіРё': 'рџџў', 'РЎС„РµСЂР° Void': 'рџ”ґ', 'РџР»Р°РјСЏ Р С‹С†Р°СЂСЏ': 'рџџ¤',
+        'РљР»СЏС‚РІР° РљСЂСѓС€РёС‚РµР»СЏ': 'рџџЎ', 'РўР°РЅС†СѓСЋС‰РёР№ РјРµС‡': 'вљЄ', 'Р‘РµСЃРєРѕРЅРµС‡РЅС‹Р№ РіРѕР»РѕРґ': 'рџ”µ',
+        'Р”РѕРјРёРЅРёРє': 'рџ”ґ', 'РЎРјРµСЂС‚РµР»СЊРЅС‹Р№ С‚Р°РЅРµС†': 'вљ«', 'Р—РёРјРЅСЏСЏ РіРѕСЂР°': 'рџџЈ',
+        'Р—Р°РїСЂРµРґРµР»СЊРЅР°СЏ СЃРёР»Р°': 'рџџў', 'Р’РѕР·РґР°СЏС‚РµР»СЊ': 'рџ”µ', 'РњРµРґР°Р»СЊРѕРЅ': 'рџџ¤',
+        'Р§РµСЂРЅС‹Р№ С‚РѕРїРѕСЂ': 'вљ«', 'РљРѕСЃС‚СЏРЅРѕР№ С‰РёС‚': 'рџџЎ', 'Р”Р¶СѓРЅРіР» РїСЂРµРґРјРµС‚': 'рџџЈ',
+        'РљР»СЏС‚РІР°': 'рџџЎ', 'РљР»РёРЅРѕРє': 'вљЄ', 'Р›РµРґСЏРЅРѕР№ С€Р»РµРј': 'рџ”µ', 'РџР»Р°С‚СЊРµ Р С‹С†Р°СЂСЏ': 'рџџ '
     };
 
     const embeds = [];
 
     const mainEmbed = new EmbedBuilder()
         .setColor(0x1a1a2e)
-        .setTitle(`${positionEmojis[position]} ТОП СБОРКИ — ${positionNames[position]}`)
-        .setDescription('**Лучшие сборки по Win Rate** (Emerald+)')
-        .setFooter({ text: 'Данные: OP.GG/U.GG | Патч 16.13' })
+        .setTitle(`${positionEmojis[position]} РўРћРџ РЎР‘РћР РљР вЂ” ${positionNames[position]}`)
+        .setDescription('**Р›СѓС‡С€РёРµ СЃР±РѕСЂРєРё РїРѕ Win Rate** (Emerald+)')
+        .setFooter({ text: 'Р”Р°РЅРЅС‹Рµ: OP.GG/U.GG | РџР°С‚С‡ 16.13' })
         .setTimestamp();
     embeds.push(mainEmbed);
 
@@ -436,17 +437,17 @@ function createBuildsEmbed(position) {
         const champ = champions[i];
 
         const itemsText = champ.items.map(item => {
-            const emoji = itemEmojis[item] || '⬛';
+            const emoji = itemEmojis[item] || 'в¬›';
             return `${emoji} ${item}`;
-        }).join(' → ');
+        }).join(' в†’ ');
 
         const buildEmbed = new EmbedBuilder()
             .setColor(0x1a1a2e)
-            .setTitle(`${getTierEmoji(champ.tier)} ${champ.name} — ${champ.tier} Tier`)
+            .setTitle(`${getTierEmoji(champ.tier)} ${champ.name} вЂ” ${champ.tier} Tier`)
             .setDescription(`**Win Rate:** ${champ.winRate}`)
             .addFields(
-                { name: '🔮 Руна', value: champ.rune, inline: true },
-                { name: '🛡 Сборка', value: itemsText, inline: false }
+                { name: 'рџ”® Р СѓРЅР°', value: champ.rune, inline: true },
+                { name: 'рџ›Ў РЎР±РѕСЂРєР°', value: itemsText, inline: false }
             )
             .setThumbnail(getChampionImage(champ.name));
         embeds.push(buildEmbed);
@@ -455,20 +456,20 @@ function createBuildsEmbed(position) {
     return embeds;
 }
 
-// Создание рейтинга embed (КРАСИВО)
+// РЎРѕР·РґР°РЅРёРµ СЂРµР№С‚РёРЅРіР° embed (РљР РђРЎРР’Рћ)
 function createRatingEmbed() {
     const embed = new EmbedBuilder()
         .setColor(0x0099ff)
-        .setTitle('🏆 РЕЙТИНГ ЧЕМПИОНОВ')
-        .setDescription('**Топ-5 по позициям** (Win Rate)\n\nДанные: OP.GG | Emerald+')
-        .setFooter({ text: 'Обновляется каждые 12 часов' })
+        .setTitle('рџЏ† Р Р•Р™РўРРќР“ Р§Р•РњРџРРћРќРћР’')
+        .setDescription('**РўРѕРї-5 РїРѕ РїРѕР·РёС†РёСЏРј** (Win Rate)\n\nР”Р°РЅРЅС‹Рµ: OP.GG | Emerald+')
+        .setFooter({ text: 'РћР±РЅРѕРІР»СЏРµС‚СЃСЏ РєР°Р¶РґС‹Рµ 12 С‡Р°СЃРѕРІ' })
         .setTimestamp();
 
     for (const [position, champions] of Object.entries(LOL_CHAMPIONS)) {
-        const positionNames = { mid: '⚔️ Мид', adc: '🏹 ADC', support: '🛡 Поддержка', jungle: '🗡 Джунгль', top: '🛡 Топ' };
+        const positionNames = { mid: 'вљ”пёЏ РњРёРґ', adc: 'рџЏ№ ADC', support: 'рџ›Ў РџРѕРґРґРµСЂР¶РєР°', jungle: 'рџ—Ў Р”Р¶СѓРЅРіР»СЊ', top: 'рџ›Ў РўРѕРї' };
         const top5 = champions.slice(0, 5).map((c, i) => {
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-            return `${medal} **${c.name}** — ${c.winRate}`;
+            const medal = i === 0 ? 'рџҐ‡' : i === 1 ? 'рџҐ€' : i === 2 ? 'рџҐ‰' : `${i + 1}.`;
+            return `${medal} **${c.name}** вЂ” ${c.winRate}`;
         }).join('\n');
 
         embed.addFields({ name: positionNames[position], value: top5, inline: true });
@@ -477,7 +478,7 @@ function createRatingEmbed() {
     return embed;
 }
 
-// Функция получения новостей
+// Р¤СѓРЅРєС†РёСЏ РїРѕР»СѓС‡РµРЅРёСЏ РЅРѕРІРѕСЃС‚РµР№
 async function fetchGameNews() {
     const allNews = [];
 
@@ -485,10 +486,10 @@ async function fetchGameNews() {
         try {
             const data = await rssParser.parseURL(feed.url);
             const items = data.items.slice(0, 5).map(item => {
-                // Извлекаем картинку из новости
+                // РР·РІР»РµРєР°РµРј РєР°СЂС‚РёРЅРєСѓ РёР· РЅРѕРІРѕСЃС‚Рё
                 let image = null;
 
-                // Проверяем разные источники картинок в RSS
+                // РџСЂРѕРІРµСЂСЏРµРј СЂР°Р·РЅС‹Рµ РёСЃС‚РѕС‡РЅРёРєРё РєР°СЂС‚РёРЅРѕРє РІ RSS
                 if (item.enclosure?.url) {
                     image = item.enclosure.url;
                 } else if (item['media:thumbnail']?.$?.url) {
@@ -496,7 +497,7 @@ async function fetchGameNews() {
                 } else if (item['media:content']?.$?.url) {
                     image = item['media:content'].$.url;
                 } else if (item.content) {
-                    // Пробуем извлечь картинку из HTML контента
+                    // РџСЂРѕР±СѓРµРј РёР·РІР»РµС‡СЊ РєР°СЂС‚РёРЅРєСѓ РёР· HTML РєРѕРЅС‚РµРЅС‚Р°
                     const imgMatch = item.content.match(/<img[^>]+src="([^"]+)"/);
                     if (imgMatch) {
                         image = imgMatch[1];
@@ -515,24 +516,24 @@ async function fetchGameNews() {
             });
             allNews.push(...items);
         } catch (err) {
-            console.error(`❌ Ошибка RSS ${feed.name}:`, err.message);
+            console.error(`вќЊ РћС€РёР±РєР° RSS ${feed.name}:`, err.message);
         }
     }
 
-    // Сортируем по дате (новые сверху)
+    // РЎРѕСЂС‚РёСЂСѓРµРј РїРѕ РґР°С‚Рµ (РЅРѕРІС‹Рµ СЃРІРµСЂС…Сѓ)
     allNews.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    return allNews.slice(0, 20); // Топ 20 новостей
+    return allNews.slice(0, 20); // РўРѕРї 20 РЅРѕРІРѕСЃС‚РµР№
 }
 
-// Функция получения LOL новостей
+// Р¤СѓРЅРєС†РёСЏ РїРѕР»СѓС‡РµРЅРёСЏ LOL РЅРѕРІРѕСЃС‚РµР№
 async function fetchLoLNews() {
     const allNews = [];
     for (const feed of LOL_RSS_FEEDS) {
         try {
             const data = await rssParser.parseURL(feed.url);
             const items = data.items.slice(0, 10).map(item => {
-                // Извлекаем картинку из новости
+                // РР·РІР»РµРєР°РµРј РєР°СЂС‚РёРЅРєСѓ РёР· РЅРѕРІРѕСЃС‚Рё
                 let image = null;
                 if (item.enclosure?.url) {
                     image = item.enclosure.url;
@@ -544,7 +545,7 @@ async function fetchLoLNews() {
                     const imgMatch = item.content.match(/<img[^>]+src="([^"]+)"/);
                     if (imgMatch) image = imgMatch[1];
                 }
-                // Fallback: попробуем встроенные картинки из content:encoded
+                // Fallback: РїРѕРїСЂРѕР±СѓРµРј РІСЃС‚СЂРѕРµРЅРЅС‹Рµ РєР°СЂС‚РёРЅРєРё РёР· content:encoded
                 if (!image && item['content:encoded']) {
                     const imgMatch = item['content:encoded'].match(/<img[^>]+src="([^"]+)"/);
                     if (imgMatch) image = imgMatch[1];
@@ -562,18 +563,18 @@ async function fetchLoLNews() {
             });
             allNews.push(...items);
         } catch (err) {
-            console.log('⚠️ LOL RSS ошибка:', feed.name, err.message);
+            console.log('вљ пёЏ LOL RSS РѕС€РёР±РєР°:', feed.name, err.message);
         }
     }
 
-    // Фильтруем только LOL-контент
+    // Р¤РёР»СЊС‚СЂСѓРµРј С‚РѕР»СЊРєРѕ LOL-РєРѕРЅС‚РµРЅС‚
     const lolNews = allNews.filter(item => isLoLContent(item.title, item.content));
-    console.log(`🎮 LOL новостей после фильтрации: ${lolNews.length} из ${allNews.length}`);
+    console.log(`рџЋ® LOL РЅРѕРІРѕСЃС‚РµР№ РїРѕСЃР»Рµ С„РёР»СЊС‚СЂР°С†РёРё: ${lolNews.length} РёР· ${allNews.length}`);
 
-    // Сортируем по дате (новые сверху)
+    // РЎРѕСЂС‚РёСЂСѓРµРј РїРѕ РґР°С‚Рµ (РЅРѕРІС‹Рµ СЃРІРµСЂС…Сѓ)
     lolNews.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Берём топ 10 и переводим на русский
+    // Р‘РµСЂС‘Рј С‚РѕРї 10 Рё РїРµСЂРµРІРѕРґРёРј РЅР° СЂСѓСЃСЃРєРёР№
     const topNews = lolNews.slice(0, 10);
     for (const item of topNews) {
         item.title = await translateToRussian(item.title);
@@ -583,80 +584,80 @@ async function fetchLoLNews() {
     return topNews;
 }
 
-// Функция публикации новости в канал
+// Р¤СѓРЅРєС†РёСЏ РїСѓР±Р»РёРєР°С†РёРё РЅРѕРІРѕСЃС‚Рё РІ РєР°РЅР°Р»
 async function postNewsToChannel(client) {
     try {
-        // Ищем канал для общих игровых новостей (не LOL)
+        // РС‰РµРј РєР°РЅР°Р» РґР»СЏ РѕР±С‰РёС… РёРіСЂРѕРІС‹С… РЅРѕРІРѕСЃС‚РµР№ (РЅРµ LOL)
         for (const [, guild] of client.guilds.cache) {
             const newsChannel = guild.channels.cache.find(ch => 
-                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')) && 
+                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('igrovye-novosti') || ch.name.includes('РёРіСЂРѕРІС‹Рµ-РЅРѕРІРѕСЃС‚Рё')) && 
                 !ch.name.includes('lol')
             );
             if (!newsChannel) {
-                console.log('⚠️ Канал новостей не найден на сервере:', guild.name);
+                console.log('вљ пёЏ РљР°РЅР°Р» РЅРѕРІРѕСЃС‚РµР№ РЅРµ РЅР°Р№РґРµРЅ РЅР° СЃРµСЂРІРµСЂРµ:', guild.name);
                 continue;
             }
 
-            console.log(`📰 Проверяю новости для ${guild.name}...`);
+            console.log(`рџ“° РџСЂРѕРІРµСЂСЏСЋ РЅРѕРІРѕСЃС‚Рё РґР»СЏ ${guild.name}...`);
             const news = await fetchGameNews();
-            console.log(`📰 Получено ${news.length} новостей`);
+            console.log(`рџ“° РџРѕР»СѓС‡РµРЅРѕ ${news.length} РЅРѕРІРѕСЃС‚РµР№`);
 
             if (news.length === 0) {
-                console.log('⚠️ Нет новостей для публикации');
+                console.log('вљ пёЏ РќРµС‚ РЅРѕРІРѕСЃС‚РµР№ РґР»СЏ РїСѓР±Р»РёРєР°С†РёРё');
                 continue;
             }
 
             let posted = 0;
             for (const item of news) {
-                // Проверяем, не публиковали ли уже эту новость
+                // РџСЂРѕРІРµСЂСЏРµРј, РЅРµ РїСѓР±Р»РёРєРѕРІР°Р»Рё Р»Рё СѓР¶Рµ СЌС‚Сѓ РЅРѕРІРѕСЃС‚СЊ
                 const newsId = `${item.source}-${item.title}`;
                 if (publishedNews.has(newsId)) continue;
 
-                // Переводим заголовок и описание на русский
+                // РџРµСЂРµРІРѕРґРёРј Р·Р°РіРѕР»РѕРІРѕРє Рё РѕРїРёСЃР°РЅРёРµ РЅР° СЂСѓСЃСЃРєРёР№
                 const translatedTitle = await translateToRussian(item.title);
                 const translatedContent = await translateToRussian(item.content);
 
-                // Публикуем новость
+                // РџСѓР±Р»РёРєСѓРµРј РЅРѕРІРѕСЃС‚СЊ
                 const embed = new EmbedBuilder()
                     .setColor(getColorBySource(item.source))
                     .setTitle(`${item.emoji} ${translatedTitle}`)
                     .setDescription(translatedContent.substring(0, 500) + (translatedContent.length > 500 ? '...' : ''))
                     .addFields(
-                        { name: '📰 Источник', value: item.source, inline: true },
-                        { name: '🕐 Дата', value: formatDate(item.date), inline: true }
+                        { name: 'рџ“° РСЃС‚РѕС‡РЅРёРє', value: item.source, inline: true },
+                        { name: 'рџ•ђ Р”Р°С‚Р°', value: formatDate(item.date), inline: true }
                     )
                     .setURL(item.link)
                     .setTimestamp();
 
-                // Добавляем картинку если есть
+                // Р”РѕР±Р°РІР»СЏРµРј РєР°СЂС‚РёРЅРєСѓ РµСЃР»Рё РµСЃС‚СЊ
                 if (item.image) {
                     try {
                         embed.setImage(item.image);
                     } catch (err) {
-                        // Картинка может быть недоступна - просто пропускаем
+                        // РљР°СЂС‚РёРЅРєР° РјРѕР¶РµС‚ Р±С‹С‚СЊ РЅРµРґРѕСЃС‚СѓРїРЅР° - РїСЂРѕСЃС‚Рѕ РїСЂРѕРїСѓСЃРєР°РµРј
                     }
                 }
 
                 await newsChannel.send({ embeds: [embed] }).catch(err => {
-                    console.error('❌ Ошибка отправки:', err.message);
+                    console.error('вќЊ РћС€РёР±РєР° РѕС‚РїСЂР°РІРєРё:', err.message);
                 });
 
-                // Добавляем в опубликованные
+                // Р”РѕР±Р°РІР»СЏРµРј РІ РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹Рµ
                 publishedNews.add(newsId);
                 posted++;
 
-                // Задержка между сообщениями (чтобы не спамить)
+                // Р—Р°РґРµСЂР¶РєР° РјРµР¶РґСѓ СЃРѕРѕР±С‰РµРЅРёСЏРјРё (С‡С‚РѕР±С‹ РЅРµ СЃРїР°РјРёС‚СЊ)
                 await new Promise(resolve => setTimeout(resolve, 1500));
             }
 
-            console.log(`✅ Опубликовано ${posted} новых новостей`);
+            console.log(`вњ… РћРїСѓР±Р»РёРєРѕРІР°РЅРѕ ${posted} РЅРѕРІС‹С… РЅРѕРІРѕСЃС‚РµР№`);
         }
     } catch (err) {
-        console.error('❌ Ошибка публикации новостей:', err);
+        console.error('вќЊ РћС€РёР±РєР° РїСѓР±Р»РёРєР°С†РёРё РЅРѕРІРѕСЃС‚РµР№:', err);
     }
 }
 
-// Цвета по источникам
+// Р¦РІРµС‚Р° РїРѕ РёСЃС‚РѕС‡РЅРёРєР°Рј
 function getColorBySource(source) {
     const colors = {
         'PC Gamer': 0x0099ff,
@@ -668,7 +669,7 @@ function getColorBySource(source) {
     return colors[source] || 0x5865f2;
 }
 
-// Форматирование даты
+// Р¤РѕСЂРјР°С‚РёСЂРѕРІР°РЅРёРµ РґР°С‚С‹
 function formatDate(dateStr) {
     try {
         const date = new Date(dateStr);
@@ -680,16 +681,16 @@ function formatDate(dateStr) {
             minute: '2-digit'
         });
     } catch {
-        return 'Недавно';
+        return 'РќРµРґР°РІРЅРѕ';
     }
 }
 
-// Перевод текста на русский (через бесплатный API)
+// РџРµСЂРµРІРѕРґ С‚РµРєСЃС‚Р° РЅР° СЂСѓСЃСЃРєРёР№ (С‡РµСЂРµР· Р±РµСЃРїР»Р°С‚РЅС‹Р№ API)
 async function translateToRussian(text) {
     if (!text || text.length < 10) return text;
 
     try {
-        // Используем MyMemory API (бесплатный, без ключа)
+        // РСЃРїРѕР»СЊР·СѓРµРј MyMemory API (Р±РµСЃРїР»Р°С‚РЅС‹Р№, Р±РµР· РєР»СЋС‡Р°)
         const encodedText = encodeURIComponent(text.substring(0, 500));
         const response = await fetch(
             `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=en|ru`,
@@ -703,221 +704,221 @@ async function translateToRussian(text) {
             }
         }
     } catch (err) {
-        console.error('⚠️ Ошибка перевода:', err.message);
+        console.error('вљ пёЏ РћС€РёР±РєР° РїРµСЂРµРІРѕРґР°:', err.message);
     }
 
-    // Fallback: возвращаем оригинальный текст
+    // Fallback: РІРѕР·РІСЂР°С‰Р°РµРј РѕСЂРёРіРёРЅР°Р»СЊРЅС‹Р№ С‚РµРєСЃС‚
     return text;
 }
 
-// ==================== КОМАНДЫ ====================
+// ==================== РљРћРњРђРќР”Р« ====================
 
 const commands = new Map();
 
-// --- МОДЕРАЦИЯ ---
+// --- РњРћР”Р•Р РђР¦РРЇ ---
 
 commands.set('kick', {
     name: 'kick',
-    description: 'Выгнать участника',
-    usage: '!kick @user [причина]',
+    description: 'Р’С‹РіРЅР°С‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°',
+    usage: '!kick @user [РїСЂРёС‡РёРЅР°]',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
-            return message.reply('❌ У тебя нет прав на кик!');
+            return message.reply('вќЊ РЈ С‚РµР±СЏ РЅРµС‚ РїСЂР°РІ РЅР° РєРёРє!');
         }
 
         const member = message.mentions.members.first();
-        if (!member) return message.reply('❌ Укажи пользователя: !kick @user [причина]');
+        if (!member) return message.reply('вќЊ РЈРєР°Р¶Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: !kick @user [РїСЂРёС‡РёРЅР°]');
 
-        const reason = args.slice(1).join(' ') || 'Не указана';
+        const reason = args.slice(1).join(' ') || 'РќРµ СѓРєР°Р·Р°РЅР°';
 
         try {
             await member.kick(reason);
             const embed = new EmbedBuilder()
                 .setColor(0xff0000)
-                .setTitle('👢 Участник выгнан')
+                .setTitle('рџ‘ў РЈС‡Р°СЃС‚РЅРёРє РІС‹РіРЅР°РЅ')
                 .addFields(
-                    { name: 'Пользователь', value: `${member.user.tag}`, inline: true },
-                    { name: 'Модератор', value: `${message.author.tag}`, inline: true },
-                    { name: 'Причина', value: reason }
+                    { name: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ', value: `${member.user.tag}`, inline: true },
+                    { name: 'РњРѕРґРµСЂР°С‚РѕСЂ', value: `${message.author.tag}`, inline: true },
+                    { name: 'РџСЂРёС‡РёРЅР°', value: reason }
                 )
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         } catch (err) {
-            message.reply('❌ Не удалось кикнуть участника!');
+            message.reply('вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ РєРёРєРЅСѓС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°!');
         }
     }
 });
 
 commands.set('ban', {
     name: 'ban',
-    description: 'Забанить участника',
-    usage: '!ban @user [причина]',
+    description: 'Р—Р°Р±Р°РЅРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°',
+    usage: '!ban @user [РїСЂРёС‡РёРЅР°]',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-            return message.reply('❌ У тебя нет прав на бан!');
+            return message.reply('вќЊ РЈ С‚РµР±СЏ РЅРµС‚ РїСЂР°РІ РЅР° Р±Р°РЅ!');
         }
 
         const member = message.mentions.members.first();
-        if (!member) return message.reply('❌ Укажи пользователя: !ban @user [причина]');
+        if (!member) return message.reply('вќЊ РЈРєР°Р¶Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: !ban @user [РїСЂРёС‡РёРЅР°]');
 
-        const reason = args.slice(1).join(' ') || 'Не указана';
+        const reason = args.slice(1).join(' ') || 'РќРµ СѓРєР°Р·Р°РЅР°';
 
         try {
             await member.ban({ reason });
             const embed = new EmbedBuilder()
                 .setColor(0xff0000)
-                .setTitle('🔨 Участник забанен')
+                .setTitle('рџ”Ё РЈС‡Р°СЃС‚РЅРёРє Р·Р°Р±Р°РЅРµРЅ')
                 .addFields(
-                    { name: 'Пользователь', value: `${member.user.tag}`, inline: true },
-                    { name: 'Модератор', value: `${message.author.tag}`, inline: true },
-                    { name: 'Причина', value: reason }
+                    { name: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ', value: `${member.user.tag}`, inline: true },
+                    { name: 'РњРѕРґРµСЂР°С‚РѕСЂ', value: `${message.author.tag}`, inline: true },
+                    { name: 'РџСЂРёС‡РёРЅР°', value: reason }
                 )
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         } catch (err) {
-            message.reply('❌ Не удалось забанить участника!');
+            message.reply('вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°Р±Р°РЅРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°!');
         }
     }
 });
 
 commands.set('unban', {
     name: 'unban',
-    description: 'Разбанить участника',
+    description: 'Р Р°Р·Р±Р°РЅРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°',
     usage: '!unban userID',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-            return message.reply('❌ У тебя нет прав на разбан!');
+            return message.reply('вќЊ РЈ С‚РµР±СЏ РЅРµС‚ РїСЂР°РІ РЅР° СЂР°Р·Р±Р°РЅ!');
         }
 
         const userId = args[0];
-        if (!userId) return message.reply('❌ Укажи ID пользователя: !unban 123456789');
+        if (!userId) return message.reply('вќЊ РЈРєР°Р¶Рё ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: !unban 123456789');
 
         try {
             await message.guild.members.unban(userId);
             const embed = new EmbedBuilder()
                 .setColor(0x00ff00)
-                .setTitle('✅ Участник разбанен')
-                .setDescription(`Пользователь с ID ${userId} разбанен`)
+                .setTitle('вњ… РЈС‡Р°СЃС‚РЅРёРє СЂР°Р·Р±Р°РЅРµРЅ')
+                .setDescription(`РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ ID ${userId} СЂР°Р·Р±Р°РЅРµРЅ`)
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         } catch (err) {
-            message.reply('❌ Не удалось разбанить участника!');
+            message.reply('вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ СЂР°Р·Р±Р°РЅРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°!');
         }
     }
 });
 
 commands.set('mute', {
     name: 'mute',
-    description: 'Замутить участника',
-    usage: '!mute @user [минуты] [причина]',
+    description: 'Р—Р°РјСѓС‚РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°',
+    usage: '!mute @user [РјРёРЅСѓС‚С‹] [РїСЂРёС‡РёРЅР°]',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-            return message.reply('❌ У тебя нет прав на мут!');
+            return message.reply('вќЊ РЈ С‚РµР±СЏ РЅРµС‚ РїСЂР°РІ РЅР° РјСѓС‚!');
         }
 
         const member = message.mentions.members.first();
-        if (!member) return message.reply('❌ Укажи пользователя: !mute @user [минуты] [причина]');
+        if (!member) return message.reply('вќЊ РЈРєР°Р¶Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: !mute @user [РјРёРЅСѓС‚С‹] [РїСЂРёС‡РёРЅР°]');
 
         const minutes = parseInt(args[1]) || 10;
-        const reason = args.slice(2).join(' ') || 'Не указана';
+        const reason = args.slice(2).join(' ') || 'РќРµ СѓРєР°Р·Р°РЅР°';
 
         try {
             await member.timeout(minutes * 60 * 1000, reason);
             const embed = new EmbedBuilder()
                 .setColor(0xffa500)
-                .setTitle('🔇 Участник замучен')
+                .setTitle('рџ”‡ РЈС‡Р°СЃС‚РЅРёРє Р·Р°РјСѓС‡РµРЅ')
                 .addFields(
-                    { name: 'Пользователь', value: `${member.user.tag}`, inline: true },
-                    { name: 'Время', value: `${minutes} мин.`, inline: true },
-                    { name: 'Модератор', value: `${message.author.tag}`, inline: true },
-                    { name: 'Причина', value: reason }
+                    { name: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ', value: `${member.user.tag}`, inline: true },
+                    { name: 'Р’СЂРµРјСЏ', value: `${minutes} РјРёРЅ.`, inline: true },
+                    { name: 'РњРѕРґРµСЂР°С‚РѕСЂ', value: `${message.author.tag}`, inline: true },
+                    { name: 'РџСЂРёС‡РёРЅР°', value: reason }
                 )
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         } catch (err) {
-            message.reply('❌ Не удалось замутить участника!');
+            message.reply('вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РјСѓС‚РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°!');
         }
     }
 });
 
 commands.set('unmute', {
     name: 'unmute',
-    description: 'Размутить участника',
+    description: 'Р Р°Р·РјСѓС‚РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°',
     usage: '!unmute @user',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-            return message.reply('❌ У тебя нет прав на unmute!');
+            return message.reply('вќЊ РЈ С‚РµР±СЏ РЅРµС‚ РїСЂР°РІ РЅР° unmute!');
         }
 
         const member = message.mentions.members.first();
-        if (!member) return message.reply('❌ Укажи пользователя: !unmute @user');
+        if (!member) return message.reply('вќЊ РЈРєР°Р¶Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: !unmute @user');
 
         try {
             await member.timeout(null);
             const embed = new EmbedBuilder()
                 .setColor(0x00ff00)
-                .setTitle('🔊 Участник размучен')
-                .setDescription(`${member.user.tag} может снова писать`)
+                .setTitle('рџ”Љ РЈС‡Р°СЃС‚РЅРёРє СЂР°Р·РјСѓС‡РµРЅ')
+                .setDescription(`${member.user.tag} РјРѕР¶РµС‚ СЃРЅРѕРІР° РїРёСЃР°С‚СЊ`)
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         } catch (err) {
-            message.reply('❌ Не удалось размутить участника!');
+            message.reply('вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ СЂР°Р·РјСѓС‚РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°!');
         }
     }
 });
 
 commands.set('clear', {
     name: 'clear',
-    description: 'Очистить сообщения',
-    usage: '!clear [количество]',
+    description: 'РћС‡РёСЃС‚РёС‚СЊ СЃРѕРѕР±С‰РµРЅРёСЏ',
+    usage: '!clear [РєРѕР»РёС‡РµСЃС‚РІРѕ]',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-            return message.reply('❌ У тебя нет прав на очистку!');
+            return message.reply('вќЊ РЈ С‚РµР±СЏ РЅРµС‚ РїСЂР°РІ РЅР° РѕС‡РёСЃС‚РєСѓ!');
         }
 
         const amount = parseInt(args[0]) || 10;
-        if (amount < 1 || amount > 100) return message.reply('❌ Укажи число от 1 до 100!');
+        if (amount < 1 || amount > 100) return message.reply('вќЊ РЈРєР°Р¶Рё С‡РёСЃР»Рѕ РѕС‚ 1 РґРѕ 100!');
 
         try {
             await message.channel.bulkDelete(amount + 1);
             const embed = new EmbedBuilder()
                 .setColor(0x00ff00)
-                .setTitle('🗑️ Сообщения удалены')
-                .setDescription(`Удалено ${amount} сообщений`)
+                .setTitle('рџ—‘пёЏ РЎРѕРѕР±С‰РµРЅРёСЏ СѓРґР°Р»РµРЅС‹')
+                .setDescription(`РЈРґР°Р»РµРЅРѕ ${amount} СЃРѕРѕР±С‰РµРЅРёР№`)
                 .setTimestamp();
             const msg = await message.channel.send({ embeds: [embed] });
             setTimeout(() => msg.delete(), 3000);
         } catch (err) {
-            message.reply('❌ Не удалось удалить сообщения!');
+            message.reply('вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ СЃРѕРѕР±С‰РµРЅРёСЏ!');
         }
     }
 });
 
-// --- МИНИ-ИГРЫ ---
+// --- РњРРќР-РР“Р Р« ---
 
 commands.set('random', {
     name: 'random',
-    description: 'Угадай число от 1 до 100',
-    usage: '!random [число]',
+    description: 'РЈРіР°РґР°Р№ С‡РёСЃР»Рѕ РѕС‚ 1 РґРѕ 100',
+    usage: '!random [С‡РёСЃР»Рѕ]',
     execute(message, args) {
         const guess = parseInt(args[0]);
         const answer = Math.floor(Math.random() * 100) + 1;
 
-        if (!guess) return message.reply('❌ Напиши число: !random 50');
+        if (!guess) return message.reply('вќЊ РќР°РїРёС€Рё С‡РёСЃР»Рѕ: !random 50');
 
         if (guess === answer) {
             const embed = new EmbedBuilder()
                 .setColor(0x00ff00)
-                .setTitle('🎉 Ты угадал!')
-                .setDescription(`Число было **${answer}**! Ты молодец!`)
+                .setTitle('рџЋ‰ РўС‹ СѓРіР°РґР°Р»!')
+                .setDescription(`Р§РёСЃР»Рѕ Р±С‹Р»Рѕ **${answer}**! РўС‹ РјРѕР»РѕРґРµС†!`)
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         } else {
-            const hint = guess > answer ? '📉 Меньше!' : '📈 Больше!';
+            const hint = guess > answer ? 'рџ“‰ РњРµРЅСЊС€Рµ!' : 'рџ“€ Р‘РѕР»СЊС€Рµ!';
             const embed = new EmbedBuilder()
                 .setColor(0xff0000)
-                .setTitle('❌ Не угадал!')
-                .setDescription(`${hint} Попробуй ещё раз!`)
+                .setTitle('вќЊ РќРµ СѓРіР°РґР°Р»!')
+                .setDescription(`${hint} РџРѕРїСЂРѕР±СѓР№ РµС‰С‘ СЂР°Р·!`)
                 .setTimestamp();
             message.channel.send({ embeds: [embed] });
         }
@@ -926,38 +927,38 @@ commands.set('random', {
 
 commands.set('rps', {
     name: 'rps',
-    description: 'Камень-ножницы-бумага',
-    usage: '!rps [камень/ножницы/бумага]',
+    description: 'РљР°РјРµРЅСЊ-РЅРѕР¶РЅРёС†С‹-Р±СѓРјР°РіР°',
+    usage: '!rps [РєР°РјРµРЅСЊ/РЅРѕР¶РЅРёС†С‹/Р±СѓРјР°РіР°]',
     execute(message, args) {
-        const choices = ['камень', 'ножницы', 'бумага'];
+        const choices = ['РєР°РјРµРЅСЊ', 'РЅРѕР¶РЅРёС†С‹', 'Р±СѓРјР°РіР°'];
         const userChoice = args[0]?.toLowerCase();
 
         if (!userChoice || !choices.includes(userChoice)) {
-            return message.reply('❌ Напиши: !rps камень/ножницы/бумага');
+            return message.reply('вќЊ РќР°РїРёС€Рё: !rps РєР°РјРµРЅСЊ/РЅРѕР¶РЅРёС†С‹/Р±СѓРјР°РіР°');
         }
 
         const botChoice = choices[Math.floor(Math.random() * 3)];
 
         let result;
         if (userChoice === botChoice) {
-            result = '🤝 Ничья!';
+            result = 'рџ¤ќ РќРёС‡СЊСЏ!';
         } else if (
-            (userChoice === 'камень' && botChoice === 'ножницы') ||
-            (userChoice === 'ножницы' && botChoice === 'бумага') ||
-            (userChoice === 'бумага' && botChoice === 'камень')
+            (userChoice === 'РєР°РјРµРЅСЊ' && botChoice === 'РЅРѕР¶РЅРёС†С‹') ||
+            (userChoice === 'РЅРѕР¶РЅРёС†С‹' && botChoice === 'Р±СѓРјР°РіР°') ||
+            (userChoice === 'Р±СѓРјР°РіР°' && botChoice === 'РєР°РјРµРЅСЊ')
         ) {
-            result = '🏆 Ты победил!';
+            result = 'рџЏ† РўС‹ РїРѕР±РµРґРёР»!';
         } else {
-            result = '💀 Ты проиграл!';
+            result = 'рџ’Ђ РўС‹ РїСЂРѕРёРіСЂР°Р»!';
         }
 
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('🎮 Камень-Ножницы-Бумага')
+            .setTitle('рџЋ® РљР°РјРµРЅСЊ-РќРѕР¶РЅРёС†С‹-Р‘СѓРјР°РіР°')
             .addFields(
-                { name: 'Твой выбор', value: userChoice, inline: true },
-                { name: 'Мой выбор', value: botChoice, inline: true },
-                { name: 'Результат', value: result }
+                { name: 'РўРІРѕР№ РІС‹Р±РѕСЂ', value: userChoice, inline: true },
+                { name: 'РњРѕР№ РІС‹Р±РѕСЂ', value: botChoice, inline: true },
+                { name: 'Р РµР·СѓР»СЊС‚Р°С‚', value: result }
             )
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
@@ -966,55 +967,55 @@ commands.set('rps', {
 
 commands.set('roulette', {
     name: 'roulette',
-    description: 'Рулетка! Ставь число 1-36 и цвет',
-    usage: '!roulette [число] [красный/чёрный/зелёный]',
+    description: 'Р СѓР»РµС‚РєР°! РЎС‚Р°РІСЊ С‡РёСЃР»Рѕ 1-36 Рё С†РІРµС‚',
+    usage: '!roulette [С‡РёСЃР»Рѕ] [РєСЂР°СЃРЅС‹Р№/С‡С‘СЂРЅС‹Р№/Р·РµР»С‘РЅС‹Р№]',
     execute(message, args) {
         const bet = parseInt(args[0]);
         const color = args[1]?.toLowerCase();
 
         if (!bet || bet < 1 || bet > 36) {
-            return message.reply('❌ Ставь число от 1 до 36: !roulette 7 красный');
+            return message.reply('вќЊ РЎС‚Р°РІСЊ С‡РёСЃР»Рѕ РѕС‚ 1 РґРѕ 36: !roulette 7 РєСЂР°СЃРЅС‹Р№');
         }
-        if (!['красный', 'чёрный', 'зелёный'].includes(color)) {
-            return message.reply('❌ Укажи цвет: красный/чёрный/зелёный');
+        if (!['РєСЂР°СЃРЅС‹Р№', 'С‡С‘СЂРЅС‹Р№', 'Р·РµР»С‘РЅС‹Р№'].includes(color)) {
+            return message.reply('вќЊ РЈРєР°Р¶Рё С†РІРµС‚: РєСЂР°СЃРЅС‹Р№/С‡С‘СЂРЅС‹Р№/Р·РµР»С‘РЅС‹Р№');
         }
 
         const result = Math.floor(Math.random() * 36) + 1;
         let resultColor;
-        if (result === 0) resultColor = 'зелёный';
-        else if (result % 2 === 0) resultColor = 'чёрный';
-        else resultColor = 'красный';
+        if (result === 0) resultColor = 'Р·РµР»С‘РЅС‹Р№';
+        else if (result % 2 === 0) resultColor = 'С‡С‘СЂРЅС‹Р№';
+        else resultColor = 'РєСЂР°СЃРЅС‹Р№';
 
         const win = bet === result;
         const colorWin = color === resultColor;
 
         let emoji;
-        if (result === 0) emoji = '🟢';
-        else if (result % 2 === 0) emoji = '⚫';
-        else emoji = '🔴';
+        if (result === 0) emoji = 'рџџў';
+        else if (result % 2 === 0) emoji = 'вљ«';
+        else emoji = 'рџ”ґ';
 
         const embed = new EmbedBuilder()
             .setColor(win ? 0x00ff00 : 0xff0000)
-            .setTitle('🎰 Рулетка')
+            .setTitle('рџЋ° Р СѓР»РµС‚РєР°')
             .addFields(
-                { name: 'Твоя ставка', value: `${bet} ${color}`, inline: true },
-                { name: 'Выпало', value: `${emoji} ${result} ${resultColor}`, inline: true },
-                { name: 'Результат', value: win ? '🏆 ДЖЕКПОТ!' : colorWin ? '✅ Цвет угадал!' : '💀 Проиграл!' }
+                { name: 'РўРІРѕСЏ СЃС‚Р°РІРєР°', value: `${bet} ${color}`, inline: true },
+                { name: 'Р’С‹РїР°Р»Рѕ', value: `${emoji} ${result} ${resultColor}`, inline: true },
+                { name: 'Р РµР·СѓР»СЊС‚Р°С‚', value: win ? 'рџЏ† Р”Р–Р•РљРџРћРў!' : colorWin ? 'вњ… Р¦РІРµС‚ СѓРіР°РґР°Р»!' : 'рџ’Ђ РџСЂРѕРёРіСЂР°Р»!' }
             )
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
 });
 
-// --- ПРИВЕТСТВИЕ ---
+// --- РџР РР’Р•РўРЎРўР’РР• ---
 
 commands.set('welcome', {
     name: 'welcome',
-    description: 'Настроить приветственный канал',
+    description: 'РќР°СЃС‚СЂРѕРёС‚СЊ РїСЂРёРІРµС‚СЃС‚РІРµРЅРЅС‹Р№ РєР°РЅР°Р»',
     usage: '!welcome #channel',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может настроить приветствие!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ РЅР°СЃС‚СЂРѕРёС‚СЊ РїСЂРёРІРµС‚СЃС‚РІРёРµ!');
         }
 
         let channel = message.mentions.channels.first();
@@ -1022,65 +1023,65 @@ commands.set('welcome', {
             const channelName = args[0].replace('#', '');
             channel = message.guild.channels.cache.find(ch => ch.name === channelName);
         }
-        if (!channel) return message.reply('❌ Укажи канал: !welcome #общее');
+        if (!channel) return message.reply('вќЊ РЈРєР°Р¶Рё РєР°РЅР°Р»: !welcome #РѕР±С‰РµРµ');
 
         process.env.WELCOME_CHANNEL = channel.name;
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
-            .setTitle('✅ Канал приветствия настроен')
-            .setDescription(`Новые участники будут приветствоваться в ${channel}`)
+            .setTitle('вњ… РљР°РЅР°Р» РїСЂРёРІРµС‚СЃС‚РІРёСЏ РЅР°СЃС‚СЂРѕРµРЅ')
+            .setDescription(`РќРѕРІС‹Рµ СѓС‡Р°СЃС‚РЅРёРєРё Р±СѓРґСѓС‚ РїСЂРёРІРµС‚СЃС‚РІРѕРІР°С‚СЊСЃСЏ РІ ${channel}`)
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
 });
 
-// --- АВТО-РОЛЬ ---
+// --- РђР’РўРћ-Р РћР›Р¬ ---
 
 commands.set('autorole', {
     name: 'autorole',
-    description: 'Настроить автос роль',
+    description: 'РќР°СЃС‚СЂРѕРёС‚СЊ Р°РІС‚РѕСЃ СЂРѕР»СЊ',
     usage: '!autorole @role',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может настроить автос роль!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ РЅР°СЃС‚СЂРѕРёС‚СЊ Р°РІС‚РѕСЃ СЂРѕР»СЊ!');
         }
 
         const role = message.mentions.roles.first();
-        if (!role) return message.reply('❌ Укажи роль: !autorole @Member');
+        if (!role) return message.reply('вќЊ РЈРєР°Р¶Рё СЂРѕР»СЊ: !autorole @Member');
 
         process.env.AUTOROLE = role.id;
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
-            .setTitle('✅ Автос роль настроена')
-            .setDescription(`Новым участникам будет выдаваться роль ${role}`)
+            .setTitle('вњ… РђРІС‚РѕСЃ СЂРѕР»СЊ РЅР°СЃС‚СЂРѕРµРЅР°')
+            .setDescription(`РќРѕРІС‹Рј СѓС‡Р°СЃС‚РЅРёРєР°Рј Р±СѓРґРµС‚ РІС‹РґР°РІР°С‚СЊСЃСЏ СЂРѕР»СЊ ${role}`)
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
 });
 
-// --- СЕРВЕР ---
+// --- РЎР•Р Р’Р•Р  ---
 
 commands.set('setup', {
     name: 'setup',
-    description: 'Создать красивую структуру сервера',
+    description: 'РЎРѕР·РґР°С‚СЊ РєСЂР°СЃРёРІСѓСЋ СЃС‚СЂСѓРєС‚СѓСЂСѓ СЃРµСЂРІРµСЂР°',
     usage: '!setup',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может настроить сервер!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ РЅР°СЃС‚СЂРѕРёС‚СЊ СЃРµСЂРІРµСЂ!');
         }
 
         const guild = message.guild;
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('⚙️ Создаю структуру сервера...')
-            .setDescription('Подожди несколько секунд...')
+            .setTitle('вљ™пёЏ РЎРѕР·РґР°СЋ СЃС‚СЂСѓРєС‚СѓСЂСѓ СЃРµСЂРІРµСЂР°...')
+            .setDescription('РџРѕРґРѕР¶РґРё РЅРµСЃРєРѕР»СЊРєРѕ СЃРµРєСѓРЅРґ...')
             .setTimestamp();
         const msg = await message.channel.send({ embeds: [embed] });
 
         try {
-            // Удаляем существующие каналы (кроме текущего)
+            // РЈРґР°Р»СЏРµРј СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёРµ РєР°РЅР°Р»С‹ (РєСЂРѕРјРµ С‚РµРєСѓС‰РµРіРѕ)
             for (const [, channel] of guild.channels.cache) {
                 if (channel.id !== message.channel.id && channel.type !== 4) {
                     await channel.delete().catch(() => {});
@@ -1092,99 +1093,99 @@ commands.set('setup', {
                 }
             }
 
-            // Создаём роли
+            // РЎРѕР·РґР°С‘Рј СЂРѕР»Рё
             const roleAdmin = await guild.roles.create({ name: 'Admin', color: 0xff0000, permissions: [PermissionsBitField.Flags.Administrator] }).catch(() => null);
             const roleMod = await guild.roles.create({ name: 'Moderator', color: 0xffa500 }).catch(() => null);
             const roleMember = await guild.roles.create({ name: 'Member', color: 0x00ff00 }).catch(() => null);
             const roleMuted = await guild.roles.create({ name: 'Muted', color: 0x808080 }).catch(() => null);
 
-            // Создаём категории и каналы
+            // РЎРѕР·РґР°С‘Рј РєР°С‚РµРіРѕСЂРёРё Рё РєР°РЅР°Р»С‹
 
-            // 📌 ИНФОРМАЦИЯ
-            const catInfo = await guild.channels.create({ name: '📌 ИНФОРМАЦИЯ', type: 4 });
-            await guild.channels.create({ name: '📜-правила', type: 0, parent: catInfo });
-            await guild.channels.create({ name: '📢-объявления', type: 0, parent: catInfo });
-            await guild.channels.create({ name: '🎫-тикеты', type: 0, parent: catInfo });
+            // рџ“Њ РРќР¤РћР РњРђР¦РРЇ
+            const catInfo = await guild.channels.create({ name: 'рџ“Њ РРќР¤РћР РњРђР¦РРЇ', type: 4 });
+            await guild.channels.create({ name: 'рџ“њ-РїСЂР°РІРёР»Р°', type: 0, parent: catInfo });
+            await guild.channels.create({ name: 'рџ“ў-РѕР±СЉСЏРІР»РµРЅРёСЏ', type: 0, parent: catInfo });
+            await guild.channels.create({ name: 'рџЋ«-С‚РёРєРµС‚С‹', type: 0, parent: catInfo });
 
-            // 💬 ТЕКСТОВЫЕ КАНАЛЫ
-            const catText = await guild.channels.create({ name: '💬 ТЕКСТОВЫЕ КАНАЛЫ', type: 4 });
-            await guild.channels.create({ name: '👋-общение', type: 0, parent: catText });
-            await guild.channels.create({ name: '🎮-игры', type: 0, parent: catText });
-            await guild.channels.create({ name: '🎵-музыка', type: 0, parent: catText });
-            await guild.channels.create({ name: '🖼-мемы', type: 0, parent: catText });
-            await guild.channels.create({ name: '🤖-бот-команды', type: 0, parent: catText });
+            // рџ’¬ РўР•РљРЎРўРћР’Р«Р• РљРђРќРђР›Р«
+            const catText = await guild.channels.create({ name: 'рџ’¬ РўР•РљРЎРўРћР’Р«Р• РљРђРќРђР›Р«', type: 4 });
+            await guild.channels.create({ name: 'рџ‘‹-РѕР±С‰РµРЅРёРµ', type: 0, parent: catText });
+            await guild.channels.create({ name: 'рџЋ®-РёРіСЂС‹', type: 0, parent: catText });
+            await guild.channels.create({ name: 'рџЋµ-РјСѓР·С‹РєР°', type: 0, parent: catText });
+            await guild.channels.create({ name: 'рџ–ј-РјРµРјС‹', type: 0, parent: catText });
+            await guild.channels.create({ name: 'рџ¤–-Р±РѕС‚-РєРѕРјР°РЅРґС‹', type: 0, parent: catText });
 
-            // 🔊 ГОЛОСОВЫЕ КАНАЛЫ
-            const catVoice = await guild.channels.create({ name: '🔊 ГОЛОСОВЫЕ КАНАЛЫ', type: 4 });
-            await guild.channels.create({ name: '🔊 Лобби', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '🎮 Игры', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '🎵 Музыка', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '💬 Разговоры', type: 2, parent: catVoice });
+            // рџ”Љ Р“РћР›РћРЎРћР’Р«Р• РљРђРќРђР›Р«
+            const catVoice = await guild.channels.create({ name: 'рџ”Љ Р“РћР›РћРЎРћР’Р«Р• РљРђРќРђР›Р«', type: 4 });
+            await guild.channels.create({ name: 'рџ”Љ Р›РѕР±Р±Рё', type: 2, parent: catVoice });
+            await guild.channels.create({ name: 'рџЋ® РРіСЂС‹', type: 2, parent: catVoice });
+            await guild.channels.create({ name: 'рџЋµ РњСѓР·С‹РєР°', type: 2, parent: catVoice });
+            await guild.channels.create({ name: 'рџ’¬ Р Р°Р·РіРѕРІРѕСЂС‹', type: 2, parent: catVoice });
 
-            // 🛡 МОДЕРАЦИЯ
-            const catMod = await guild.channels.create({ name: '🛡 МОДЕРАЦИЯ', type: 4 });
-            await guild.channels.create({ name: '📋-логи', type: 0, parent: catMod });
-            await guild.channels.create({ name: '⚡-модерация-чат', type: 0, parent: catMod });
+            // рџ›Ў РњРћР”Р•Р РђР¦РРЇ
+            const catMod = await guild.channels.create({ name: 'рџ›Ў РњРћР”Р•Р РђР¦РРЇ', type: 4 });
+            await guild.channels.create({ name: 'рџ“‹-Р»РѕРіРё', type: 0, parent: catMod });
+            await guild.channels.create({ name: 'вљЎ-РјРѕРґРµСЂР°С†РёСЏ-С‡Р°С‚', type: 0, parent: catMod });
 
             const successEmbed = new EmbedBuilder()
                 .setColor(0x00ff00)
-                .setTitle('✅ Сервер готов!')
-                .setDescription('Создана красивая структура:')
+                .setTitle('вњ… РЎРµСЂРІРµСЂ РіРѕС‚РѕРІ!')
+                .setDescription('РЎРѕР·РґР°РЅР° РєСЂР°СЃРёРІР°СЏ СЃС‚СЂСѓРєС‚СѓСЂР°:')
                 .addFields(
-                    { name: '📌 Информация', value: 'Правила, Объявления, Тикеты', inline: true },
-                    { name: '💬 Текстовые', value: 'Общение, Игры, Музыка, Мемы, Бот', inline: true },
-                    { name: '🔊 Голосовые', value: 'Лобби, Игры, Музыка, Разговоры', inline: true },
-                    { name: '🛡 Модерация', value: 'Логи, Модерация чат', inline: true },
-                    { name: '🎭 Роли', value: 'Admin, Moderator, Member, Muted', inline: true }
+                    { name: 'рџ“Њ РРЅС„РѕСЂРјР°С†РёСЏ', value: 'РџСЂР°РІРёР»Р°, РћР±СЉСЏРІР»РµРЅРёСЏ, РўРёРєРµС‚С‹', inline: true },
+                    { name: 'рџ’¬ РўРµРєСЃС‚РѕРІС‹Рµ', value: 'РћР±С‰РµРЅРёРµ, РРіСЂС‹, РњСѓР·С‹РєР°, РњРµРјС‹, Р‘РѕС‚', inline: true },
+                    { name: 'рџ”Љ Р“РѕР»РѕСЃРѕРІС‹Рµ', value: 'Р›РѕР±Р±Рё, РРіСЂС‹, РњСѓР·С‹РєР°, Р Р°Р·РіРѕРІРѕСЂС‹', inline: true },
+                    { name: 'рџ›Ў РњРѕРґРµСЂР°С†РёСЏ', value: 'Р›РѕРіРё, РњРѕРґРµСЂР°С†РёСЏ С‡Р°С‚', inline: true },
+                    { name: 'рџЋ­ Р РѕР»Рё', value: 'Admin, Moderator, Member, Muted', inline: true }
                 )
                 .setTimestamp();
             msg.edit({ embeds: [successEmbed] });
         } catch (err) {
-            console.error('❌ Ошибка setup:', err);
-            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+            console.error('вќЊ РћС€РёР±РєР° setup:', err);
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('вќЊ РћС€РёР±РєР°').setDescription(err.message)] });
         }
     }
 });
 
-// --- ИГРОВЫЕ НОВОСТИ ---
+// --- РР“Р РћР’Р«Р• РќРћР’РћРЎРўР ---
 
 commands.set('gamenews', {
     name: 'gamenews',
-    description: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ"',
+    description: 'РЎРѕР·РґР°С‚СЊ РєР°С‚РµРіРѕСЂРёСЋ "рџЋ® РР“Р РћР’Р«Р• РќРћР’РћРЎРўР"',
     usage: '!gamenews',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ!');
         }
 
         const guild = message.guild;
-        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('🎮 Создаю каналы...').setTimestamp()] });
+        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('рџЋ® РЎРѕР·РґР°СЋ РєР°РЅР°Р»С‹...').setTimestamp()] });
 
         try {
-            const category = await guild.channels.create({ name: '🎮 ИГРОВЫЕ НОВОСТИ', type: 4 });
+            const category = await guild.channels.create({ name: 'рџЋ® РР“Р РћР’Р«Р• РќРћР’РћРЎРўР', type: 4 });
             await new Promise(r => setTimeout(r, 1000));
 
-            const ch1 = await guild.channels.create({ name: '📰-игровые-новости', type: 0, parent: category });
+            const ch1 = await guild.channels.create({ name: 'рџ“°-РёРіСЂРѕРІС‹Рµ-РЅРѕРІРѕСЃС‚Рё', type: 0, parent: category });
             await new Promise(r => setTimeout(r, 500));
-            const ch2 = await guild.channels.create({ name: '🎮-lol-новости', type: 0, parent: category });
+            const ch2 = await guild.channels.create({ name: 'рџЋ®-lol-РЅРѕРІРѕСЃС‚Рё', type: 0, parent: category });
             await new Promise(r => setTimeout(r, 500));
-            const ch3 = await guild.channels.create({ name: '⚔️-lol-гайды', type: 0, parent: category });
+            const ch3 = await guild.channels.create({ name: 'вљ”пёЏ-lol-РіР°Р№РґС‹', type: 0, parent: category });
             await new Promise(r => setTimeout(r, 500));
-            const ch4 = await guild.channels.create({ name: '💬-lol-команды', type: 0, parent: category });
+            const ch4 = await guild.channels.create({ name: 'рџ’¬-lol-РєРѕРјР°РЅРґС‹', type: 0, parent: category });
 
             const everyone = guild.roles.everyone;
             const owner = await guild.members.fetch(guild.ownerId).catch(() => null);
             const adminRole = guild.roles.cache.find(r => r.name === 'Admin');
             const modRole = guild.roles.cache.find(r => r.name === 'Moderator');
 
-            // Каналы автопостинга - никто не пишет кроме.owner и Admin
+            // РљР°РЅР°Р»С‹ Р°РІС‚РѕРїРѕСЃС‚РёРЅРіР° - РЅРёРєС‚Рѕ РЅРµ РїРёС€РµС‚ РєСЂРѕРјРµ.owner Рё Admin
             for (const ch of [ch1, ch2, ch3]) {
                 await ch.permissionOverwrites.edit(everyone, { SendMessages: false });
                 if (owner) await ch.permissionOverwrites.edit(owner, { SendMessages: true });
                 if (adminRole) await ch.permissionOverwrites.edit(adminRole, { SendMessages: true });
             }
 
-            // Канал команд - пишет только.owner, Admin, Moderator
+            // РљР°РЅР°Р» РєРѕРјР°РЅРґ - РїРёС€РµС‚ С‚РѕР»СЊРєРѕ.owner, Admin, Moderator
             await ch4.permissionOverwrites.edit(everyone, { SendMessages: false });
             if (owner) await ch4.permissionOverwrites.edit(owner, { SendMessages: true });
             if (adminRole) await ch4.permissionOverwrites.edit(adminRole, { SendMessages: true });
@@ -1192,113 +1193,113 @@ commands.set('gamenews', {
 
             await new Promise(r => setTimeout(r, 2000));
 
-            // Приветствия
-            await ch1.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('Последние новости из мира игр!\n\nGTA, Cyberpunk, Call of Duty и другие.\nПеревод на русский язык.\nАвто-обновление каждые 4 часа.').setTimestamp()] });
-            await ch2.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Последние новости League of Legends!\n\nПатч-ноуты, новые чемпионы, скины.\nТурнирные новости.\nАвто-обновление.').setTimestamp()] });
-            await ch3.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ И СТАТИСТИКА').setDescription('Tier List, сборки, рейтинги!\n\nДанные: OP.GG | Патч 16.13\nАвто-обновление каждые 6-12 часов.').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
+            // РџСЂРёРІРµС‚СЃС‚РІРёСЏ
+            await ch1.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('рџ“° РР“Р РћР’Р«Р• РќРћР’РћРЎРўР').setDescription('РџРѕСЃР»РµРґРЅРёРµ РЅРѕРІРѕСЃС‚Рё РёР· РјРёСЂР° РёРіСЂ!\n\nGTA, Cyberpunk, Call of Duty Рё РґСЂСѓРіРёРµ.\nРџРµСЂРµРІРѕРґ РЅР° СЂСѓСЃСЃРєРёР№ СЏР·С‹Рє.\nРђРІС‚Рѕ-РѕР±РЅРѕРІР»РµРЅРёРµ РєР°Р¶РґС‹Рµ 4 С‡Р°СЃР°.').setTimestamp()] });
+            await ch2.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('рџЋ® LOL РќРћР’РћРЎРўР').setDescription('РџРѕСЃР»РµРґРЅРёРµ РЅРѕРІРѕСЃС‚Рё League of Legends!\n\nРџР°С‚С‡-РЅРѕСѓС‚С‹, РЅРѕРІС‹Рµ С‡РµРјРїРёРѕРЅС‹, СЃРєРёРЅС‹.\nРўСѓСЂРЅРёСЂРЅС‹Рµ РЅРѕРІРѕСЃС‚Рё.\nРђРІС‚Рѕ-РѕР±РЅРѕРІР»РµРЅРёРµ.').setTimestamp()] });
+            await ch3.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('вљ”пёЏ LOL Р“РђР™Р”Р« Р РЎРўРђРўРРЎРўРРљРђ').setDescription('Tier List, СЃР±РѕСЂРєРё, СЂРµР№С‚РёРЅРіРё!\n\nР”Р°РЅРЅС‹Рµ: OP.GG | РџР°С‚С‡ 16.13\nРђРІС‚Рѕ-РѕР±РЅРѕРІР»РµРЅРёРµ РєР°Р¶РґС‹Рµ 6-12 С‡Р°СЃРѕРІ.').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
             await ch3.send({ embeds: [createTierListEmbed()] });
-            await ch4.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь! Бот ответит.\n\n**Доступные команды:**\n`!tierlist` — Tier List\n`!top mid` — Топ чемпионов\n`!builds mid` — Сборки\n`!rating` — Рейтинг\n`!counter Ahri` — Статистика\n`!lolnews` — Новости\n`!lolhelp` — Подробная помощь').setTimestamp()] });
+            await ch4.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('рџ’¬ LOL РљРћРњРђРќР”Р«').setDescription('РџРёС€РёС‚Рµ РєРѕРјР°РЅРґС‹ Р·РґРµСЃСЊ! Р‘РѕС‚ РѕС‚РІРµС‚РёС‚.\n\n**Р”РѕСЃС‚СѓРїРЅС‹Рµ РєРѕРјР°РЅРґС‹:**\n`!tierlist` вЂ” Tier List\n`!top mid` вЂ” РўРѕРї С‡РµРјРїРёРѕРЅРѕРІ\n`!builds mid` вЂ” РЎР±РѕСЂРєРё\n`!rating` вЂ” Р РµР№С‚РёРЅРі\n`!counter Ahri` вЂ” РЎС‚Р°С‚РёСЃС‚РёРєР°\n`!lolnews` вЂ” РќРѕРІРѕСЃС‚Рё\n`!lolhelp` вЂ” РџРѕРґСЂРѕР±РЅР°СЏ РїРѕРјРѕС‰СЊ').setTimestamp()] });
 
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('✅ Каналы созданы!').setDescription('📰-игровые-новости\n🎮-lol-новости\n⚔️-lol-гайды\n💬-lol-команды').setTimestamp()] });
+            await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('вњ… РљР°РЅР°Р»С‹ СЃРѕР·РґР°РЅС‹!').setDescription('рџ“°-РёРіСЂРѕРІС‹Рµ-РЅРѕРІРѕСЃС‚Рё\nрџЋ®-lol-РЅРѕРІРѕСЃС‚Рё\nвљ”пёЏ-lol-РіР°Р№РґС‹\nрџ’¬-lol-РєРѕРјР°РЅРґС‹').setTimestamp()] });
 
         } catch (err) {
-            console.error('❌ Ошибка gamenews:', err);
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+            console.error('вќЊ РћС€РёР±РєР° gamenews:', err);
+            await msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('вќЊ РћС€РёР±РєР°').setDescription(err.message)] });
         }
     }
 });
 
-// --- ОТПРАВИТЬ В TELEGRAM ---
+// --- РћРўРџР РђР’РРўР¬ Р’ TELEGRAM ---
 
 commands.set('tg', {
     name: 'tg',
-    description: 'Отправить сообщение в Telegram',
-    usage: '!tg [сообщение]',
+    description: 'РћС‚РїСЂР°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ РІ Telegram',
+    usage: '!tg [СЃРѕРѕР±С‰РµРЅРёРµ]',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ!');
         }
 
         if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-            return message.reply('❌ Telegram не настроен! Добавь TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в .env');
+            return message.reply('вќЊ Telegram РЅРµ РЅР°СЃС‚СЂРѕРµРЅ! Р”РѕР±Р°РІСЊ TELEGRAM_BOT_TOKEN Рё TELEGRAM_CHAT_ID РІ .env');
         }
 
         const text = args.join(' ');
-        if (!text) return message.reply('❌ Напиши сообщение: !tg Привет из Discord!');
+        if (!text) return message.reply('вќЊ РќР°РїРёС€Рё СЃРѕРѕР±С‰РµРЅРёРµ: !tg РџСЂРёРІРµС‚ РёР· Discord!');
 
         await sendToTelegram(text);
-        message.reply('✅ Отправлено в Telegram!');
+        message.reply('вњ… РћС‚РїСЂР°РІР»РµРЅРѕ РІ Telegram!');
     }
 });
 
-// --- ОТПРАВИТЬ ПРИВЕТСТВИЯ ---
+// --- РћРўРџР РђР’РРўР¬ РџР РР’Р•РўРЎРўР’РРЇ ---
 
 commands.set('postwelcome', {
     name: 'postwelcome',
-    description: 'Отправить приветственные сообщения',
+    description: 'РћС‚РїСЂР°РІРёС‚СЊ РїСЂРёРІРµС‚СЃС‚РІРµРЅРЅС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ',
     usage: '!postwelcome',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ!');
         }
 
         const guild = message.guild;
-        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📢 Отправляю...').setTimestamp()] });
+        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('рџ“ў РћС‚РїСЂР°РІР»СЏСЋ...').setTimestamp()] });
 
-        // Получаем ВСЕ текстовые каналы
+        // РџРѕР»СѓС‡Р°РµРј Р’РЎР• С‚РµРєСЃС‚РѕРІС‹Рµ РєР°РЅР°Р»С‹
         const channels = guild.channels.cache.filter(ch => ch.type === 0);
         
         let sent = 0;
 
         for (const [, channel] of channels) {
             try {
-                // Проверяем название канала
+                // РџСЂРѕРІРµСЂСЏРµРј РЅР°Р·РІР°РЅРёРµ РєР°РЅР°Р»Р°
                 const name = channel.name;
                 
-                if (name.includes('игровые') && name.includes('новости')) {
-                    await channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('GTA, Cyberpunk, Call of Duty и другие игры!\nАвто-обновление каждые 4 часа.').setTimestamp()] });
+                if (name.includes('РёРіСЂРѕРІС‹Рµ') && name.includes('РЅРѕРІРѕСЃС‚Рё')) {
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('рџ“° РР“Р РћР’Р«Р• РќРћР’РћРЎРўР').setDescription('GTA, Cyberpunk, Call of Duty Рё РґСЂСѓРіРёРµ РёРіСЂС‹!\nРђРІС‚Рѕ-РѕР±РЅРѕРІР»РµРЅРёРµ РєР°Р¶РґС‹Рµ 4 С‡Р°СЃР°.').setTimestamp()] });
                     sent++;
                 }
                 
-                if (name.includes('lol') && name.includes('новости')) {
-                    await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Патч-ноуты, скины, турниры!\nАвто-обновление.').setTimestamp()] });
+                if (name.includes('lol') && name.includes('РЅРѕРІРѕСЃС‚Рё')) {
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('рџЋ® LOL РќРћР’РћРЎРўР').setDescription('РџР°С‚С‡-РЅРѕСѓС‚С‹, СЃРєРёРЅС‹, С‚СѓСЂРЅРёСЂС‹!\nРђРІС‚Рѕ-РѕР±РЅРѕРІР»РµРЅРёРµ.').setTimestamp()] });
                     sent++;
                 }
                 
-                if (name.includes('lol') && name.includes('гайды')) {
-                    await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ').setDescription('Tier List, сборки, рейтинги!\nПишите команды в 💬-lol-команды').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
+                if (name.includes('lol') && name.includes('РіР°Р№РґС‹')) {
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('вљ”пёЏ LOL Р“РђР™Р”Р«').setDescription('Tier List, СЃР±РѕСЂРєРё, СЂРµР№С‚РёРЅРіРё!\nРџРёС€РёС‚Рµ РєРѕРјР°РЅРґС‹ РІ рџ’¬-lol-РєРѕРјР°РЅРґС‹').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
                     await channel.send({ embeds: [createTierListEmbed()] });
                     sent++;
                 }
                 
-                if (name.includes('lol') && name.includes('команды')) {
-                    await channel.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь!\n\n!tierlist - Tier List\n!top mid - Топ чемпионов\n!builds mid - Сборки\n!rating - Рейтинг\n!counter Ahri - Статистика\n!lolnews - Новости').setTimestamp()] });
+                if (name.includes('lol') && name.includes('РєРѕРјР°РЅРґС‹')) {
+                    await channel.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('рџ’¬ LOL РљРћРњРђРќР”Р«').setDescription('РџРёС€РёС‚Рµ РєРѕРјР°РЅРґС‹ Р·РґРµСЃСЊ!\n\n!tierlist - Tier List\n!top mid - РўРѕРї С‡РµРјРїРёРѕРЅРѕРІ\n!builds mid - РЎР±РѕСЂРєРё\n!rating - Р РµР№С‚РёРЅРі\n!counter Ahri - РЎС‚Р°С‚РёСЃС‚РёРєР°\n!lolnews - РќРѕРІРѕСЃС‚Рё').setTimestamp()] });
                     sent++;
                 }
             } catch (err) {
-                console.log('❌ Ошибка в канале', channel.name, err.message);
+                console.log('вќЊ РћС€РёР±РєР° РІ РєР°РЅР°Р»Рµ', channel.name, err.message);
             }
         }
 
-        await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle(`✅ Готово! Отправлено в ${sent} каналов`).setTimestamp()] });
+        await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle(`вњ… Р“РѕС‚РѕРІРѕ! РћС‚РїСЂР°РІР»РµРЅРѕ РІ ${sent} РєР°РЅР°Р»РѕРІ`).setTimestamp()] });
     }
 });
 
-// --- ОБНОВИТЬ НОВОСТИ ---
+// --- РћР‘РќРћР’РРўР¬ РќРћР’РћРЎРўР ---
 
 commands.set('news', {
     name: 'news',
-    description: 'Обновить игровые новости вручную',
+    description: 'РћР±РЅРѕРІРёС‚СЊ РёРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё РІСЂСѓС‡РЅСѓСЋ',
     usage: '!news',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может обновлять новости!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ РѕР±РЅРѕРІР»СЏС‚СЊ РЅРѕРІРѕСЃС‚Рё!');
         }
 
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('🎮 Обновляю игровые новости...')
-            .setDescription('Подожди несколько секунд...')
+            .setTitle('рџЋ® РћР±РЅРѕРІР»СЏСЋ РёРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё...')
+            .setDescription('РџРѕРґРѕР¶РґРё РЅРµСЃРєРѕР»СЊРєРѕ СЃРµРєСѓРЅРґ...')
             .setTimestamp();
         const msg = await message.channel.send({ embeds: [embed] });
 
@@ -1307,21 +1308,21 @@ commands.set('news', {
 
             const successEmbed = new EmbedBuilder()
                 .setColor(0x00ff00)
-                .setTitle('✅ Новости обновлены!')
-                .setDescription('Новые новости опубликованы в канале **🎮-новости**')
+                .setTitle('вњ… РќРѕРІРѕСЃС‚Рё РѕР±РЅРѕРІР»РµРЅС‹!')
+                .setDescription('РќРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё РѕРїСѓР±Р»РёРєРѕРІР°РЅС‹ РІ РєР°РЅР°Р»Рµ **рџЋ®-РЅРѕРІРѕСЃС‚Рё**')
                 .setTimestamp();
             msg.edit({ embeds: [successEmbed] });
         } catch (err) {
-            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('вќЊ РћС€РёР±РєР°').setDescription(err.message)] });
         }
     }
 });
 
-// --- LOL КОМАНДЫ ---
+// --- LOL РљРћРњРђРќР”Р« ---
 
 commands.set('tierlist', {
     name: 'tierlist',
-    description: 'Tier List чемпионов по тирам',
+    description: 'Tier List С‡РµРјРїРёРѕРЅРѕРІ РїРѕ С‚РёСЂР°Рј',
     usage: '!tierlist',
     async execute(message) {
         const embed = createTierListEmbed();
@@ -1331,17 +1332,17 @@ commands.set('tierlist', {
 
 commands.set('top', {
     name: 'top',
-    description: 'Топ чемпионов по линии',
+    description: 'РўРѕРї С‡РµРјРїРёРѕРЅРѕРІ РїРѕ Р»РёРЅРёРё',
     usage: '!top [mid/adc/support/jungle/top]',
     async execute(message, args) {
         const position = args[0]?.toLowerCase();
         if (!position || !['mid', 'adc', 'support', 'jungle', 'top'].includes(position)) {
-            return message.reply('❌ Укажи линию: `!top mid` `!top adc` `!top support` `!top jungle` `!top top`');
+            return message.reply('вќЊ РЈРєР°Р¶Рё Р»РёРЅРёСЋ: `!top mid` `!top adc` `!top support` `!top jungle` `!top top`');
         }
 
         const embeds = createTopChampionsEmbed(position);
         if (embeds && embeds.length > 0) {
-            // Discord позволяет отправить до 10 embed за раз
+            // Discord РїРѕР·РІРѕР»СЏРµС‚ РѕС‚РїСЂР°РІРёС‚СЊ РґРѕ 10 embed Р·Р° СЂР°Р·
             for (let i = 0; i < embeds.length; i += 10) {
                 await message.channel.send({ embeds: embeds.slice(i, i + 10) });
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -1352,12 +1353,12 @@ commands.set('top', {
 
 commands.set('builds', {
     name: 'builds',
-    description: 'Топ сборки по позиции',
+    description: 'РўРѕРї СЃР±РѕСЂРєРё РїРѕ РїРѕР·РёС†РёРё',
     usage: '!builds [mid/adc/support/jungle/top]',
     async execute(message, args) {
         const position = args[0]?.toLowerCase();
         if (!position || !['mid', 'adc', 'support', 'jungle', 'top'].includes(position)) {
-            return message.reply('❌ Укажи позицию: `!builds mid` `!builds adc` `!builds support` `!builds jungle` `!builds top`');
+            return message.reply('вќЊ РЈРєР°Р¶Рё РїРѕР·РёС†РёСЋ: `!builds mid` `!builds adc` `!builds support` `!builds jungle` `!builds top`');
         }
 
         const embeds = createBuildsEmbed(position);
@@ -1372,7 +1373,7 @@ commands.set('builds', {
 
 commands.set('rating', {
     name: 'rating',
-    description: 'Рейтинг чемпионов по позициям',
+    description: 'Р РµР№С‚РёРЅРі С‡РµРјРїРёРѕРЅРѕРІ РїРѕ РїРѕР·РёС†РёСЏРј',
     usage: '!rating',
     async execute(message) {
         const embed = createRatingEmbed();
@@ -1382,32 +1383,32 @@ commands.set('rating', {
 
 commands.set('counter', {
     name: 'counter',
-    description: 'Показать контры чемпиона',
-    usage: '!counter [имя чемпиона]',
+    description: 'РџРѕРєР°Р·Р°С‚СЊ РєРѕРЅС‚СЂС‹ С‡РµРјРїРёРѕРЅР°',
+    usage: '!counter [РёРјСЏ С‡РµРјРїРёРѕРЅР°]',
     async execute(message, args) {
         const champ = args[0];
-        if (!champ) return message.reply('❌ Укажи чемпиона: `!counter Ahri`');
+        if (!champ) return message.reply('вќЊ РЈРєР°Р¶Рё С‡РµРјРїРёРѕРЅР°: `!counter Ahri`');
 
-        // Ищем чемпиона во всех позициях
+        // РС‰РµРј С‡РµРјРїРёРѕРЅР° РІРѕ РІСЃРµС… РїРѕР·РёС†РёСЏС…
         let foundChamp = null;
         for (const champions of Object.values(LOL_CHAMPIONS)) {
             foundChamp = champions.find(c => c.name.toLowerCase() === champ.toLowerCase());
             if (foundChamp) break;
         }
 
-        if (!foundChamp) return message.reply('❌ Чемпион не найден! Попробуй: Ahri, Jinx, Thresh, Garen, Nasus');
+        if (!foundChamp) return message.reply('вќЊ Р§РµРјРїРёРѕРЅ РЅРµ РЅР°Р№РґРµРЅ! РџРѕРїСЂРѕР±СѓР№: Ahri, Jinx, Thresh, Garen, Nasus');
 
         const embed = new EmbedBuilder()
             .setColor(getTierColor(foundChamp.tier))
             .setTitle(`${getTierEmoji(foundChamp.tier)} ${foundChamp.name}`)
-            .setDescription(`**Статистика чемпиона** (Emerald+)`)
+            .setDescription(`**РЎС‚Р°С‚РёСЃС‚РёРєР° С‡РµРјРїРёРѕРЅР°** (Emerald+)`)
             .addFields(
-                { name: '📊 Статистика', value: `**WR:** ${foundChamp.winRate} | **PR:** ${foundChamp.pickRate} | **BR:** ${foundChamp.banRate}`, inline: false },
-                { name: '🔮 Руна', value: foundChamp.rune, inline: true },
-                { name: '🛡 Сборка', value: foundChamp.items.join(' → '), inline: true }
+                { name: 'рџ“Љ РЎС‚Р°С‚РёСЃС‚РёРєР°', value: `**WR:** ${foundChamp.winRate} | **PR:** ${foundChamp.pickRate} | **BR:** ${foundChamp.banRate}`, inline: false },
+                { name: 'рџ”® Р СѓРЅР°', value: foundChamp.rune, inline: true },
+                { name: 'рџ›Ў РЎР±РѕСЂРєР°', value: foundChamp.items.join(' в†’ '), inline: true }
             )
             .setThumbnail(getChampionImage(foundChamp.name))
-            .setFooter({ text: 'Данные: OP.GG | Emerald+' })
+            .setFooter({ text: 'Р”Р°РЅРЅС‹Рµ: OP.GG | Emerald+' })
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
@@ -1415,12 +1416,12 @@ commands.set('counter', {
 
 commands.set('lolnews', {
     name: 'lolnews',
-    description: 'Новости League of Legends',
+    description: 'РќРѕРІРѕСЃС‚Рё League of Legends',
     usage: '!lolnews',
     async execute(message) {
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('📰 Загружаю новости LOL...')
+            .setTitle('рџ“° Р—Р°РіСЂСѓР¶Р°СЋ РЅРѕРІРѕСЃС‚Рё LOL...')
             .setTimestamp();
         const msg = await message.channel.send({ embeds: [embed] });
 
@@ -1428,7 +1429,7 @@ commands.set('lolnews', {
             const news = await fetchLoLNews();
 
             if (news.length === 0) {
-                return msg.edit({ embeds: [new EmbedBuilder().setColor(0xffa500).setTitle('⚠️ Нет новостей').setDescription('Не удалось загрузить новости LOL')] });
+                return msg.edit({ embeds: [new EmbedBuilder().setColor(0xffa500).setTitle('вљ пёЏ РќРµС‚ РЅРѕРІРѕСЃС‚РµР№').setDescription('РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РЅРѕРІРѕСЃС‚Рё LOL')] });
             }
 
             const embeds = news.map(item => {
@@ -1438,7 +1439,7 @@ commands.set('lolnews', {
                     .setTitle(`${item.emoji} ${item.title}`)
                     .setDescription(item.content.substring(0, 300) + '...')
                     .addFields(
-                        { name: '📰 Источник', value: item.source, inline: true }
+                        { name: 'рџ“° РСЃС‚РѕС‡РЅРёРє', value: item.source, inline: true }
                     )
                     .setURL(item.link)
                     .setTimestamp();
@@ -1450,66 +1451,62 @@ commands.set('lolnews', {
                 return embed;
             });
 
-            await msg.edit({ embeds: [embeds[0]] });
-
-            // Отправляем остальные новости
-            for (let i = 1; i < Math.min(embeds.length, 5); i++) {
-                await message.channel.send({ embeds: [embeds[i]] });
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+            // Отправляем все embed пакетом по 10 (1 уведомление)
+            const allEmbeds = embeds.slice(0, 10);
+            await msg.edit({ embeds: allEmbeds });
         } catch (err) {
-            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('вќЊ РћС€РёР±РєР°').setDescription(err.message)] });
         }
     }
 });
 
-// --- ПОМОЩЬ ПО LOL ---
+// --- РџРћРњРћР©Р¬ РџРћ LOL ---
 
 commands.set('lolhelp', {
     name: 'lolhelp',
-    description: 'Подробная помощь по LOL командам',
+    description: 'РџРѕРґСЂРѕР±РЅР°СЏ РїРѕРјРѕС‰СЊ РїРѕ LOL РєРѕРјР°РЅРґР°Рј',
     usage: '!lolhelp',
     async execute(message) {
         const embed = new EmbedBuilder()
             .setColor(0xffd700)
-            .setTitle('⚔️ ПОМОЩЬ ПО LEAGUE OF LEGENDS')
-            .setDescription('Все команды для LOL с примерами:')
+            .setTitle('вљ”пёЏ РџРћРњРћР©Р¬ РџРћ LEAGUE OF LEGENDS')
+            .setDescription('Р’СЃРµ РєРѕРјР°РЅРґС‹ РґР»СЏ LOL СЃ РїСЂРёРјРµСЂР°РјРё:')
             .addFields(
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**📊 TIER LIST**', inline: false },
-                { name: '`!tierlist`', value: 'Показать текущий Tier List чемпионов\nПример: `!tierlist`', inline: false },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡 СБОРКИ**', inline: false },
-                { name: '`!builds [позиция]`', value: 'Топ сборки по позиции\nПозиции: `mid` `adc` `support` `jungle` `top`\nПример: `!builds mid`', inline: false },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🏆 РЕЙТИНГ**', inline: false },
-                { name: '`!rating`', value: 'Рейтинг чемпионов по позициям\nПример: `!rating`', inline: false },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡 КОНТРЫ**', inline: false },
-                { name: '`!counter [чемпион]`', value: 'Лучшие контры против чемпиона\nПример: `!counter Locke`', inline: false },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**📰 НОВОСТИ**', inline: false },
-                { name: '`!lolnews`', value: 'Новости LOL на русском языке с картинками\nИсточники: Surrender at 20, LoL Esports, LeagueFeed\nПример: `!lolnews`', inline: false },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**⏰ АВТО-ОБНОВЛЕНИЕ**', inline: false },
-                { name: 'Tier List', value: 'Каждые 6 часов (09:00, 15:00, 21:00)', inline: true },
-                { name: 'Сборки', value: 'Каждые 8 часов (10:00, 18:00)', inline: true },
-                { name: 'Рейтинг', value: 'Каждые 12 часов (00:00, 12:00)', inline: true }
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ“Љ TIER LIST**', inline: false },
+                { name: '`!tierlist`', value: 'РџРѕРєР°Р·Р°С‚СЊ С‚РµРєСѓС‰РёР№ Tier List С‡РµРјРїРёРѕРЅРѕРІ\nРџСЂРёРјРµСЂ: `!tierlist`', inline: false },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ›Ў РЎР‘РћР РљР**', inline: false },
+                { name: '`!builds [РїРѕР·РёС†РёСЏ]`', value: 'РўРѕРї СЃР±РѕСЂРєРё РїРѕ РїРѕР·РёС†РёРё\nРџРѕР·РёС†РёРё: `mid` `adc` `support` `jungle` `top`\nРџСЂРёРјРµСЂ: `!builds mid`', inline: false },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџЏ† Р Р•Р™РўРРќР“**', inline: false },
+                { name: '`!rating`', value: 'Р РµР№С‚РёРЅРі С‡РµРјРїРёРѕРЅРѕРІ РїРѕ РїРѕР·РёС†РёСЏРј\nРџСЂРёРјРµСЂ: `!rating`', inline: false },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ›Ў РљРћРќРўР Р«**', inline: false },
+                { name: '`!counter [С‡РµРјРїРёРѕРЅ]`', value: 'Р›СѓС‡С€РёРµ РєРѕРЅС‚СЂС‹ РїСЂРѕС‚РёРІ С‡РµРјРїРёРѕРЅР°\nРџСЂРёРјРµСЂ: `!counter Locke`', inline: false },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ“° РќРћР’РћРЎРўР**', inline: false },
+                { name: '`!lolnews`', value: 'РќРѕРІРѕСЃС‚Рё LOL РЅР° СЂСѓСЃСЃРєРѕРј СЏР·С‹РєРµ СЃ РєР°СЂС‚РёРЅРєР°РјРё\nРСЃС‚РѕС‡РЅРёРєРё: Surrender at 20, LoL Esports, LeagueFeed\nРџСЂРёРјРµСЂ: `!lolnews`', inline: false },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**вЏ° РђР’РўРћ-РћР‘РќРћР’Р›Р•РќРР•**', inline: false },
+                { name: 'Tier List', value: 'РљР°Р¶РґС‹Рµ 6 С‡Р°СЃРѕРІ (09:00, 15:00, 21:00)', inline: true },
+                { name: 'РЎР±РѕСЂРєРё', value: 'РљР°Р¶РґС‹Рµ 8 С‡Р°СЃРѕРІ (10:00, 18:00)', inline: true },
+                { name: 'Р РµР№С‚РёРЅРі', value: 'РљР°Р¶РґС‹Рµ 12 С‡Р°СЃРѕРІ (00:00, 12:00)', inline: true }
             )
             .setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png')
-            .setFooter({ text: 'Данные: OP.GG | Все данные на русском языке' })
+            .setFooter({ text: 'Р”Р°РЅРЅС‹Рµ: OP.GG | Р’СЃРµ РґР°РЅРЅС‹Рµ РЅР° СЂСѓСЃСЃРєРѕРј СЏР·С‹РєРµ' })
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
 });
 
-// --- ВЕРИФИКАЦИЯ ---
+// --- Р’Р•Р РР¤РРљРђР¦РРЇ ---
 
 commands.set('verify', {
     name: 'verify',
-    description: 'Создать систему верификации',
-    usage: '!verify #канал',
+    description: 'РЎРѕР·РґР°С‚СЊ СЃРёСЃС‚РµРјСѓ РІРµСЂРёС„РёРєР°С†РёРё',
+    usage: '!verify #РєР°РЅР°Р»',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может настраивать верификацию!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ РЅР°СЃС‚СЂР°РёРІР°С‚СЊ РІРµСЂРёС„РёРєР°С†РёСЋ!');
         }
 
         const channel = message.mentions.channels.first() || message.guild.channels.cache.find(ch => ch.name === (args[0] || '').replace('#', ''));
-        if (!channel) return message.reply('❌ Укажи канал: !verify #.verify');
+        if (!channel) return message.reply('вќЊ РЈРєР°Р¶Рё РєР°РЅР°Р»: !verify #.verify');
 
         let verifiedRole = message.guild.roles.cache.find(r => r.name === 'Verified');
         if (!verifiedRole) {
@@ -1521,168 +1518,168 @@ commands.set('verify', {
 
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('✅ Верификация')
-            .setDescription('Нажми ✅ чтобы подтвердить, что ты не бот, и получить доступ к серверу!')
-            .setFooter({ text: 'Без верификации ты не сможешь писать в чатах.' })
+            .setTitle('вњ… Р’РµСЂРёС„РёРєР°С†РёСЏ')
+            .setDescription('РќР°Р¶РјРё вњ… С‡С‚РѕР±С‹ РїРѕРґС‚РІРµСЂРґРёС‚СЊ, С‡С‚Рѕ С‚С‹ РЅРµ Р±РѕС‚, Рё РїРѕР»СѓС‡РёС‚СЊ РґРѕСЃС‚СѓРї Рє СЃРµСЂРІРµСЂСѓ!')
+            .setFooter({ text: 'Р‘РµР· РІРµСЂРёС„РёРєР°С†РёРё С‚С‹ РЅРµ СЃРјРѕР¶РµС€СЊ РїРёСЃР°С‚СЊ РІ С‡Р°С‚Р°С….' })
             .setTimestamp();
 
         const msg = await channel.send({ embeds: [embed] });
-        await msg.react('✅');
+        await msg.react('вњ…');
 
-        message.reply(`✅ Верификация настроена в ${channel}`);
+        message.reply(`вњ… Р’РµСЂРёС„РёРєР°С†РёСЏ РЅР°СЃС‚СЂРѕРµРЅР° РІ ${channel}`);
     }
 });
 
-// --- ПРАВИЛА ---
+// --- РџР РђР’РР›Рђ ---
 
 commands.set('rules', {
     name: 'rules',
-    description: 'Опубликовать правила сервера',
+    description: 'РћРїСѓР±Р»РёРєРѕРІР°С‚СЊ РїСЂР°РІРёР»Р° СЃРµСЂРІРµСЂР°',
     usage: '!rules',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может публиковать правила!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ РїСѓР±Р»РёРєРѕРІР°С‚СЊ РїСЂР°РІРёР»Р°!');
         }
 
-        const rulesChannel = message.guild.channels.cache.find(ch => ch.name === '📜-правила');
-        if (!rulesChannel) return message.reply('❌ Канал #📜-правила не найден!');
+        const rulesChannel = message.guild.channels.cache.find(ch => ch.name === 'рџ“њ-РїСЂР°РІРёР»Р°');
+        if (!rulesChannel) return message.reply('вќЊ РљР°РЅР°Р» #рџ“њ-РїСЂР°РІРёР»Р° РЅРµ РЅР°Р№РґРµРЅ!');
 
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('📜 ПРАВИЛА СЕРВЕРА')
-            .setDescription('Добро пожаловать на **Сервер ZOHAN**! Пожалуйста, ознакомьтесь с правилами перед использованием сервера.')
+            .setTitle('рџ“њ РџР РђР’РР›Рђ РЎР•Р Р’Р•Р Рђ')
+            .setDescription('Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ РЅР° **РЎРµСЂРІРµСЂ ZOHAN**! РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РѕР·РЅР°РєРѕРјСЊС‚РµСЃСЊ СЃ РїСЂР°РІРёР»Р°РјРё РїРµСЂРµРґ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµРј СЃРµСЂРІРµСЂР°.')
             .addFields(
-                { name: '1️⃣ Уважение', value: 'Уважайте других участников. Запрещены оскорбления, дискриминация, расизм и любые формы харассмента.' },
-                { name: '2️⃣ Спам и реклама', value: 'Запрещён спам, массовые сообщения, реклама других серверов, ботов и товаров без разрешения администратора.' },
-                { name: '3️⃣ Ссылки', value: 'Запрещены сторонние ссылки в чатах. Исключение — ссылки в #🎮-игры с разрешения модератора.' },
-                { name: '4️⃣ Голосовые каналы', value: 'Запрещён крик, микрофон-спам, звуковые эффекты без согласия участников. Уважайте чужое пространство.' },
-                { name: '5️⃣ NSFW контент', value: 'Запрещён порнографический, жестокий и любой 18+ контент. За нарушение — бан.' },
-                { name: '6️⃣ Личные данные', value: 'Запрещено публиковать личные данные других людей (адреса, телефоны, фото) без их согласия.' },
-                { name: '7️⃣ Мультиаккаунты', value: 'Запрещено использование нескольких аккаунтов для обхода бана или мута.' },
-                { name: '8️⃣ Админы', value: 'Следуйте инструкциям модераторов и администраторов. Их решения окончательны.' },
-                { name: '9️⃣ Музыка', value: 'Используйте бота музыки только в голосовых каналах. Не злоупотребляйте командами.' },
-                { name: '🔟 Здравый смысл', value: 'Если действие может навредить серверу или участникам — не делайте его.' }
+                { name: '1пёЏвѓЈ РЈРІР°Р¶РµРЅРёРµ', value: 'РЈРІР°Р¶Р°Р№С‚Рµ РґСЂСѓРіРёС… СѓС‡Р°СЃС‚РЅРёРєРѕРІ. Р—Р°РїСЂРµС‰РµРЅС‹ РѕСЃРєРѕСЂР±Р»РµРЅРёСЏ, РґРёСЃРєСЂРёРјРёРЅР°С†РёСЏ, СЂР°СЃРёР·Рј Рё Р»СЋР±С‹Рµ С„РѕСЂРјС‹ С…Р°СЂР°СЃСЃРјРµРЅС‚Р°.' },
+                { name: '2пёЏвѓЈ РЎРїР°Рј Рё СЂРµРєР»Р°РјР°', value: 'Р—Р°РїСЂРµС‰С‘РЅ СЃРїР°Рј, РјР°СЃСЃРѕРІС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ, СЂРµРєР»Р°РјР° РґСЂСѓРіРёС… СЃРµСЂРІРµСЂРѕРІ, Р±РѕС‚РѕРІ Рё С‚РѕРІР°СЂРѕРІ Р±РµР· СЂР°Р·СЂРµС€РµРЅРёСЏ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°.' },
+                { name: '3пёЏвѓЈ РЎСЃС‹Р»РєРё', value: 'Р—Р°РїСЂРµС‰РµРЅС‹ СЃС‚РѕСЂРѕРЅРЅРёРµ СЃСЃС‹Р»РєРё РІ С‡Р°С‚Р°С…. РСЃРєР»СЋС‡РµРЅРёРµ вЂ” СЃСЃС‹Р»РєРё РІ #рџЋ®-РёРіСЂС‹ СЃ СЂР°Р·СЂРµС€РµРЅРёСЏ РјРѕРґРµСЂР°С‚РѕСЂР°.' },
+                { name: '4пёЏвѓЈ Р“РѕР»РѕСЃРѕРІС‹Рµ РєР°РЅР°Р»С‹', value: 'Р—Р°РїСЂРµС‰С‘РЅ РєСЂРёРє, РјРёРєСЂРѕС„РѕРЅ-СЃРїР°Рј, Р·РІСѓРєРѕРІС‹Рµ СЌС„С„РµРєС‚С‹ Р±РµР· СЃРѕРіР»Р°СЃРёСЏ СѓС‡Р°СЃС‚РЅРёРєРѕРІ. РЈРІР°Р¶Р°Р№С‚Рµ С‡СѓР¶РѕРµ РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІРѕ.' },
+                { name: '5пёЏвѓЈ NSFW РєРѕРЅС‚РµРЅС‚', value: 'Р—Р°РїСЂРµС‰С‘РЅ РїРѕСЂРЅРѕРіСЂР°С„РёС‡РµСЃРєРёР№, Р¶РµСЃС‚РѕРєРёР№ Рё Р»СЋР±РѕР№ 18+ РєРѕРЅС‚РµРЅС‚. Р—Р° РЅР°СЂСѓС€РµРЅРёРµ вЂ” Р±Р°РЅ.' },
+                { name: '6пёЏвѓЈ Р›РёС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ', value: 'Р—Р°РїСЂРµС‰РµРЅРѕ РїСѓР±Р»РёРєРѕРІР°С‚СЊ Р»РёС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ РґСЂСѓРіРёС… Р»СЋРґРµР№ (Р°РґСЂРµСЃР°, С‚РµР»РµС„РѕРЅС‹, С„РѕС‚Рѕ) Р±РµР· РёС… СЃРѕРіР»Р°СЃРёСЏ.' },
+                { name: '7пёЏвѓЈ РњСѓР»СЊС‚РёР°РєРєР°СѓРЅС‚С‹', value: 'Р—Р°РїСЂРµС‰РµРЅРѕ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РЅРµСЃРєРѕР»СЊРєРёС… Р°РєРєР°СѓРЅС‚РѕРІ РґР»СЏ РѕР±С…РѕРґР° Р±Р°РЅР° РёР»Рё РјСѓС‚Р°.' },
+                { name: '8пёЏвѓЈ РђРґРјРёРЅС‹', value: 'РЎР»РµРґСѓР№С‚Рµ РёРЅСЃС‚СЂСѓРєС†РёСЏРј РјРѕРґРµСЂР°С‚РѕСЂРѕРІ Рё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРІ. РС… СЂРµС€РµРЅРёСЏ РѕРєРѕРЅС‡Р°С‚РµР»СЊРЅС‹.' },
+                { name: '9пёЏвѓЈ РњСѓР·С‹РєР°', value: 'РСЃРїРѕР»СЊР·СѓР№С‚Рµ Р±РѕС‚Р° РјСѓР·С‹РєРё С‚РѕР»СЊРєРѕ РІ РіРѕР»РѕСЃРѕРІС‹С… РєР°РЅР°Р»Р°С…. РќРµ Р·Р»РѕСѓРїРѕС‚СЂРµР±Р»СЏР№С‚Рµ РєРѕРјР°РЅРґР°РјРё.' },
+                { name: 'рџ”џ Р—РґСЂР°РІС‹Р№ СЃРјС‹СЃР»', value: 'Р•СЃР»Рё РґРµР№СЃС‚РІРёРµ РјРѕР¶РµС‚ РЅР°РІСЂРµРґРёС‚СЊ СЃРµСЂРІРµСЂСѓ РёР»Рё СѓС‡Р°СЃС‚РЅРёРєР°Рј вЂ” РЅРµ РґРµР»Р°Р№С‚Рµ РµРіРѕ.' }
             )
-            .setFooter({ text: 'Нарушение правил ведёт к муту, кику или бану. Приятного общения! 🎮' })
+            .setFooter({ text: 'РќР°СЂСѓС€РµРЅРёРµ РїСЂР°РІРёР» РІРµРґС‘С‚ Рє РјСѓС‚Сѓ, РєРёРєСѓ РёР»Рё Р±Р°РЅСѓ. РџСЂРёСЏС‚РЅРѕРіРѕ РѕР±С‰РµРЅРёСЏ! рџЋ®' })
             .setTimestamp();
 
         await rulesChannel.send({ embeds: [embed] });
 
         const successEmbed = new EmbedBuilder()
             .setColor(0x00ff00)
-            .setTitle('✅ Правила опубликованы!')
-            .setDescription(`Правила отправлены в ${rulesChannel}`)
+            .setTitle('вњ… РџСЂР°РІРёР»Р° РѕРїСѓР±Р»РёРєРѕРІР°РЅС‹!')
+            .setDescription(`РџСЂР°РІРёР»Р° РѕС‚РїСЂР°РІР»РµРЅС‹ РІ ${rulesChannel}`)
             .setTimestamp();
         message.channel.send({ embeds: [successEmbed] });
     }
 });
 
-// --- КОМАНДЫ ДЛЯ ВСЕХ ---
+// --- РљРћРњРђРќР”Р« Р”Р›РЇ Р’РЎР•РҐ ---
 
 commands.set('commands', {
     name: 'commands',
-    description: 'Отправить публичные команды в канал',
-    usage: '!commands #канал',
+    description: 'РћС‚РїСЂР°РІРёС‚СЊ РїСѓР±Р»РёС‡РЅС‹Рµ РєРѕРјР°РЅРґС‹ РІ РєР°РЅР°Р»',
+    usage: '!commands #РєР°РЅР°Р»',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚!');
         }
 
         const channel = message.mentions.channels.first() || message.guild.channels.cache.find(ch => ch.name === (args[0] || '').replace('#', ''));
-        if (!channel) return message.reply('❌ Укажи канал: !commands #🤖-бот-команды');
+        if (!channel) return message.reply('вќЊ РЈРєР°Р¶Рё РєР°РЅР°Р»: !commands #рџ¤–-Р±РѕС‚-РєРѕРјР°РЅРґС‹');
 
         const embed1 = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('📚 КОМАНДЫ СЕРВЕРА')
-            .setDescription('Все доступные команды для участников')
+            .setTitle('рџ“љ РљРћРњРђРќР”Р« РЎР•Р Р’Р•Р Рђ')
+            .setDescription('Р’СЃРµ РґРѕСЃС‚СѓРїРЅС‹Рµ РєРѕРјР°РЅРґС‹ РґР»СЏ СѓС‡Р°СЃС‚РЅРёРєРѕРІ')
             .addFields(
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🎮 МИНИ-ИГРЫ**', inline: false },
-                { name: '`!random [число]`', value: 'Угадай число от 1 до 100', inline: true },
-                { name: '`!rps [камень/ножницы/бумага]`', value: 'Камень-ножницы-бумага', inline: true },
-                { name: '`!roulette [число] [цвет]`', value: 'Рулетка (красный/чёрный/зелёный)', inline: true },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🎵 МУЗЫКА** (Jockie Music)', inline: false },
-                { name: '`m!play [название/ссылка]`', value: 'Включить музыку', inline: true },
-                { name: '`m!skip`', value: 'Пропустить трек', inline: true },
-                { name: '`m!stop`', value: 'Остановить музыку', inline: true },
-                { name: '`m!leave`', value: 'Бот выходит из голосового', inline: true },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🎉 РАЗВЛЕЧЕНИЯ**', inline: false },
-                { name: '`!poll Вопрос | Вариант1 | Вариант2`', value: 'Создать опрос', inline: false },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ АВТО**', inline: false },
-                { name: 'Анти-спам', value: '30+ сообщений за 10 сек = мут', inline: true },
-                { name: 'Анти-ссылки', value: 'Ссылки запрещены (кроме игр, музыки, бот-команд)', inline: true }
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџЋ® РњРРќР-РР“Р Р«**', inline: false },
+                { name: '`!random [С‡РёСЃР»Рѕ]`', value: 'РЈРіР°РґР°Р№ С‡РёСЃР»Рѕ РѕС‚ 1 РґРѕ 100', inline: true },
+                { name: '`!rps [РєР°РјРµРЅСЊ/РЅРѕР¶РЅРёС†С‹/Р±СѓРјР°РіР°]`', value: 'РљР°РјРµРЅСЊ-РЅРѕР¶РЅРёС†С‹-Р±СѓРјР°РіР°', inline: true },
+                { name: '`!roulette [С‡РёСЃР»Рѕ] [С†РІРµС‚]`', value: 'Р СѓР»РµС‚РєР° (РєСЂР°СЃРЅС‹Р№/С‡С‘СЂРЅС‹Р№/Р·РµР»С‘РЅС‹Р№)', inline: true },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџЋµ РњРЈР—Р«РљРђ** (Jockie Music)', inline: false },
+                { name: '`m!play [РЅР°Р·РІР°РЅРёРµ/СЃСЃС‹Р»РєР°]`', value: 'Р’РєР»СЋС‡РёС‚СЊ РјСѓР·С‹РєСѓ', inline: true },
+                { name: '`m!skip`', value: 'РџСЂРѕРїСѓСЃС‚РёС‚СЊ С‚СЂРµРє', inline: true },
+                { name: '`m!stop`', value: 'РћСЃС‚Р°РЅРѕРІРёС‚СЊ РјСѓР·С‹РєСѓ', inline: true },
+                { name: '`m!leave`', value: 'Р‘РѕС‚ РІС‹С…РѕРґРёС‚ РёР· РіРѕР»РѕСЃРѕРІРѕРіРѕ', inline: true },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџЋ‰ Р РђР—Р’Р›Р•Р§Р•РќРРЇ**', inline: false },
+                { name: '`!poll Р’РѕРїСЂРѕСЃ | Р’Р°СЂРёР°РЅС‚1 | Р’Р°СЂРёР°РЅС‚2`', value: 'РЎРѕР·РґР°С‚СЊ РѕРїСЂРѕСЃ', inline: false },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ›ЎпёЏ РђР’РўРћ**', inline: false },
+                { name: 'РђРЅС‚Рё-СЃРїР°Рј', value: '30+ СЃРѕРѕР±С‰РµРЅРёР№ Р·Р° 10 СЃРµРє = РјСѓС‚', inline: true },
+                { name: 'РђРЅС‚Рё-СЃСЃС‹Р»РєРё', value: 'РЎСЃС‹Р»РєРё Р·Р°РїСЂРµС‰РµРЅС‹ (РєСЂРѕРјРµ РёРіСЂ, РјСѓР·С‹РєРё, Р±РѕС‚-РєРѕРјР°РЅРґ)', inline: true }
             )
-            .setFooter({ text: 'Бот: Зохан младший • Музыка: Jockie Music (m!play)' })
+            .setFooter({ text: 'Р‘РѕС‚: Р—РѕС…Р°РЅ РјР»Р°РґС€РёР№ вЂў РњСѓР·С‹РєР°: Jockie Music (m!play)' })
             .setTimestamp();
         await channel.send({ embeds: [embed1] });
 
-        message.reply(`✅ Публичные команды отправлены в ${channel}`);
+        message.reply(`вњ… РџСѓР±Р»РёС‡РЅС‹Рµ РєРѕРјР°РЅРґС‹ РѕС‚РїСЂР°РІР»РµРЅС‹ РІ ${channel}`);
     }
 });
 
-// --- КОМАНДЫ ДЛЯ АДМИНОВ ---
+// --- РљРћРњРђРќР”Р« Р”Р›РЇ РђР”РњРРќРћР’ ---
 
 commands.set('modcommands', {
     name: 'modcommands',
-    description: 'Отправить команды модерации в канал',
-    usage: '!modcommands #канал',
+    description: 'РћС‚РїСЂР°РІРёС‚СЊ РєРѕРјР°РЅРґС‹ РјРѕРґРµСЂР°С†РёРё РІ РєР°РЅР°Р»',
+    usage: '!modcommands #РєР°РЅР°Р»',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚!');
         }
 
         const channel = message.mentions.channels.first() || message.guild.channels.cache.find(ch => ch.name === (args[0] || '').replace('#', ''));
-        if (!channel) return message.reply('❌ Укажи канал: !modcommands #⚡-модерация-чат');
+        if (!channel) return message.reply('вќЊ РЈРєР°Р¶Рё РєР°РЅР°Р»: !modcommands #вљЎ-РјРѕРґРµСЂР°С†РёСЏ-С‡Р°С‚');
 
         const embed1 = new EmbedBuilder()
             .setColor(0xff0000)
-            .setTitle('🛡️ КОМАНДЫ МОДЕРАЦИИ')
-            .setDescription('Только для модераторов и администраторов')
+            .setTitle('рџ›ЎпёЏ РљРћРњРђРќР”Р« РњРћР”Р•Р РђР¦РР')
+            .setDescription('РўРѕР»СЊРєРѕ РґР»СЏ РјРѕРґРµСЂР°С‚РѕСЂРѕРІ Рё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРІ')
             .addFields(
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ МОДЕРАЦИЯ**', inline: false },
-                { name: '`!kick @user [причина]`', value: 'Выгнать участника', inline: true },
-                { name: '`!ban @user [причина]`', value: 'Забанить участника', inline: true },
-                { name: '`!unban ID`', value: 'Разбанить участника', inline: true },
-                { name: '`!mute @user [минуты] [причина]`', value: 'Замутить участника', inline: true },
-                { name: '`!unmute @user`', value: 'Размутить участника', inline: true },
-                { name: '`!clear [кол-во]`', value: 'Удалить сообщения', inline: true },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**⚙️ НАСТРОЙКА СЕРВЕРА**', inline: false },
-                { name: '`!setup`', value: 'Автосоздание структуры сервера', inline: true },
-                { name: '`!rules`', value: 'Опубликовать правила', inline: true },
-                { name: '`!welcome #канал`', value: 'Настроить приветствие', inline: true },
-                { name: '`!autorole @роль`', value: 'Настроить автос роль', inline: true },
-                { name: '`!verify #канал`', value: 'Настроить верификацию', inline: true },
-                { name: '`!reactrole #канал | Роль:эмодзи`', value: 'Роли по реакциям', inline: false },
-                { name: '`!giveaway время | приз | описание`', value: 'Розыгрыш (секунды)', inline: false },
-                { name: '`!commands #канал`', value: 'Публичные команды', inline: true },
-                { name: '`!modcommands #канал`', value: 'Этот список', inline: true },
-                { name: '`!gamenews`', value: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ"', inline: true },
-                { name: '`!news`', value: 'Обновить новости вручную', inline: true },
-                { name: '`!dellolcommands`', value: 'Удалить канал lol-команды', inline: true },
-                { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡️ АВТОМАТИЧЕСКИ**', inline: false },
-                { name: 'Логирование', value: 'Удаление/редактирование в #📋-логи', inline: true },
-                { name: 'Прощание', value: 'Сообщение когда кто-то вышел', inline: true }
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ›ЎпёЏ РњРћР”Р•Р РђР¦РРЇ**', inline: false },
+                { name: '`!kick @user [РїСЂРёС‡РёРЅР°]`', value: 'Р’С‹РіРЅР°С‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
+                { name: '`!ban @user [РїСЂРёС‡РёРЅР°]`', value: 'Р—Р°Р±Р°РЅРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
+                { name: '`!unban ID`', value: 'Р Р°Р·Р±Р°РЅРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
+                { name: '`!mute @user [РјРёРЅСѓС‚С‹] [РїСЂРёС‡РёРЅР°]`', value: 'Р—Р°РјСѓС‚РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
+                { name: '`!unmute @user`', value: 'Р Р°Р·РјСѓС‚РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР°', inline: true },
+                { name: '`!clear [РєРѕР»-РІРѕ]`', value: 'РЈРґР°Р»РёС‚СЊ СЃРѕРѕР±С‰РµРЅРёСЏ', inline: true },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**вљ™пёЏ РќРђРЎРўР РћР™РљРђ РЎР•Р Р’Р•Р Рђ**', inline: false },
+                { name: '`!setup`', value: 'РђРІС‚РѕСЃРѕР·РґР°РЅРёРµ СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃРµСЂРІРµСЂР°', inline: true },
+                { name: '`!rules`', value: 'РћРїСѓР±Р»РёРєРѕРІР°С‚СЊ РїСЂР°РІРёР»Р°', inline: true },
+                { name: '`!welcome #РєР°РЅР°Р»`', value: 'РќР°СЃС‚СЂРѕРёС‚СЊ РїСЂРёРІРµС‚СЃС‚РІРёРµ', inline: true },
+                { name: '`!autorole @СЂРѕР»СЊ`', value: 'РќР°СЃС‚СЂРѕРёС‚СЊ Р°РІС‚РѕСЃ СЂРѕР»СЊ', inline: true },
+                { name: '`!verify #РєР°РЅР°Р»`', value: 'РќР°СЃС‚СЂРѕРёС‚СЊ РІРµСЂРёС„РёРєР°С†РёСЋ', inline: true },
+                { name: '`!reactrole #РєР°РЅР°Р» | Р РѕР»СЊ:СЌРјРѕРґР·Рё`', value: 'Р РѕР»Рё РїРѕ СЂРµР°РєС†РёСЏРј', inline: false },
+                { name: '`!giveaway РІСЂРµРјСЏ | РїСЂРёР· | РѕРїРёСЃР°РЅРёРµ`', value: 'Р РѕР·С‹РіСЂС‹С€ (СЃРµРєСѓРЅРґС‹)', inline: false },
+                { name: '`!commands #РєР°РЅР°Р»`', value: 'РџСѓР±Р»РёС‡РЅС‹Рµ РєРѕРјР°РЅРґС‹', inline: true },
+                { name: '`!modcommands #РєР°РЅР°Р»`', value: 'Р­С‚РѕС‚ СЃРїРёСЃРѕРє', inline: true },
+                { name: '`!gamenews`', value: 'РЎРѕР·РґР°С‚СЊ РєР°С‚РµРіРѕСЂРёСЋ "рџЋ® РР“Р РћР’Р«Р• РќРћР’РћРЎРўР"', inline: true },
+                { name: '`!news`', value: 'РћР±РЅРѕРІРёС‚СЊ РЅРѕРІРѕСЃС‚Рё РІСЂСѓС‡РЅСѓСЋ', inline: true },
+                { name: '`!dellolcommands`', value: 'РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» lol-РєРѕРјР°РЅРґС‹', inline: true },
+                { name: 'в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ', value: '**рџ›ЎпёЏ РђР’РўРћРњРђРўРР§Р•РЎРљР**', inline: false },
+                { name: 'Р›РѕРіРёСЂРѕРІР°РЅРёРµ', value: 'РЈРґР°Р»РµРЅРёРµ/СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ РІ #рџ“‹-Р»РѕРіРё', inline: true },
+                { name: 'РџСЂРѕС‰Р°РЅРёРµ', value: 'РЎРѕРѕР±С‰РµРЅРёРµ РєРѕРіРґР° РєС‚Рѕ-С‚Рѕ РІС‹С€РµР»', inline: true }
             )
-            .setFooter({ text: 'Только для модераторов!' })
+            .setFooter({ text: 'РўРѕР»СЊРєРѕ РґР»СЏ РјРѕРґРµСЂР°С‚РѕСЂРѕРІ!' })
             .setTimestamp();
         await channel.send({ embeds: [embed1] });
 
-        message.reply(`✅ Команды модерации отправлены в ${channel}`);
+        message.reply(`вњ… РљРѕРјР°РЅРґС‹ РјРѕРґРµСЂР°С†РёРё РѕС‚РїСЂР°РІР»РµРЅС‹ РІ ${channel}`);
     }
 });
 
-// --- СПРЯТАТЬ МОД КАНАЛЫ ---
+// --- РЎРџР РЇРўРђРўР¬ РњРћР” РљРђРќРђР›Р« ---
 
 commands.set('lockmod', {
     name: 'lockmod',
-    description: 'Спрятать модераторские каналы от обычных участников',
+    description: 'РЎРїСЂСЏС‚Р°С‚СЊ РјРѕРґРµСЂР°С‚РѕСЂСЃРєРёРµ РєР°РЅР°Р»С‹ РѕС‚ РѕР±С‹С‡РЅС‹С… СѓС‡Р°СЃС‚РЅРёРєРѕРІ',
     usage: '!lockmod',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚!');
         }
 
         const everyone = message.guild.roles.everyone;
-        const modChannels = ['📋-логи', '⚡-модерация-чат'];
+        const modChannels = ['рџ“‹-Р»РѕРіРё', 'вљЎ-РјРѕРґРµСЂР°С†РёСЏ-С‡Р°С‚'];
 
         for (const name of modChannels) {
             const channel = message.guild.channels.cache.find(ch => ch.name === name);
@@ -1692,7 +1689,7 @@ commands.set('lockmod', {
                 ViewChannel: false,
             }).catch(() => {});
 
-            // Добавляем права для Admin и Moderator если их роли есть
+            // Р”РѕР±Р°РІР»СЏРµРј РїСЂР°РІР° РґР»СЏ Admin Рё Moderator РµСЃР»Рё РёС… СЂРѕР»Рё РµСЃС‚СЊ
             const adminRole = message.guild.roles.cache.find(r => r.name === 'Admin');
             const modRole = message.guild.roles.cache.find(r => r.name === 'Moderator');
 
@@ -1710,102 +1707,102 @@ commands.set('lockmod', {
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
-            .setTitle('🔒 Модераторские каналы скрыты')
-            .setDescription('Каналы **#📋-логи** и **#⚡-модерация-чат** теперь видны только модераторам и админам.')
+            .setTitle('рџ”’ РњРѕРґРµСЂР°С‚РѕСЂСЃРєРёРµ РєР°РЅР°Р»С‹ СЃРєСЂС‹С‚С‹')
+            .setDescription('РљР°РЅР°Р»С‹ **#рџ“‹-Р»РѕРіРё** Рё **#вљЎ-РјРѕРґРµСЂР°С†РёСЏ-С‡Р°С‚** С‚РµРїРµСЂСЊ РІРёРґРЅС‹ С‚РѕР»СЊРєРѕ РјРѕРґРµСЂР°С‚РѕСЂР°Рј Рё Р°РґРјРёРЅР°Рј.')
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
 });
 
-// --- УДАЛИТЬ ТИКЕТЫ ---
+// --- РЈР”РђР›РРўР¬ РўРРљР•РўР« ---
 
 commands.set('deltickets', {
     name: 'deltickets',
-    description: 'Удалить канал тикетов',
+    description: 'РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» С‚РёРєРµС‚РѕРІ',
     usage: '!deltickets',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚!');
         }
 
-        const channel = message.guild.channels.cache.find(ch => ch.name === '🎫-тикеты');
-        if (!channel) return message.reply('❌ Канал тикетов не найден!');
+        const channel = message.guild.channels.cache.find(ch => ch.name === 'рџЋ«-С‚РёРєРµС‚С‹');
+        if (!channel) return message.reply('вќЊ РљР°РЅР°Р» С‚РёРєРµС‚РѕРІ РЅРµ РЅР°Р№РґРµРЅ!');
 
         await channel.delete().catch(() => {});
-        message.reply('✅ Канал тикетов удалён!');
+        message.reply('вњ… РљР°РЅР°Р» С‚РёРєРµС‚РѕРІ СѓРґР°Р»С‘РЅ!');
     }
 });
 
-// --- УДАЛИТЬ LOL КОМАНДЫ ---
+// --- РЈР”РђР›РРўР¬ LOL РљРћРњРђРќР”Р« ---
 
 commands.set('dellolcommands', {
     name: 'dellolcommands',
-    description: 'Удалить канал lol-команды',
+    description: 'РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» lol-РєРѕРјР°РЅРґС‹',
     usage: '!dellolcommands',
     async execute(message) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ!');
         }
 
-        const channel = message.guild.channels.cache.find(ch => ch.name.includes('lol-komandy') || ch.name.includes('lol-команды'));
-        if (!channel) return message.reply('❌ Канал не найден!');
+        const channel = message.guild.channels.cache.find(ch => ch.name.includes('lol-komandy') || ch.name.includes('lol-РєРѕРјР°РЅРґС‹'));
+        if (!channel) return message.reply('вќЊ РљР°РЅР°Р» РЅРµ РЅР°Р№РґРµРЅ!');
 
         await channel.delete().catch(() => {});
-        message.reply('✅ Канал удалён!');
+        message.reply('вњ… РљР°РЅР°Р» СѓРґР°Р»С‘РЅ!');
     }
 });
 
-// --- ПОМОЩЬ ---
+// --- РџРћРњРћР©Р¬ ---
 
 commands.set('help', {
     name: 'help',
-    description: 'Показать все команды',
+    description: 'РџРѕРєР°Р·Р°С‚СЊ РІСЃРµ РєРѕРјР°РЅРґС‹',
     execute(message) {
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('📚 Команды бота')
-            .setDescription('Все доступные команды:')
+            .setTitle('рџ“љ РљРѕРјР°РЅРґС‹ Р±РѕС‚Р°')
+            .setDescription('Р’СЃРµ РґРѕСЃС‚СѓРїРЅС‹Рµ РєРѕРјР°РЅРґС‹:')
             .addFields(
-                { name: '🛡️ Модерация', value: '`!kick` `!ban` `!unban` `!mute` `!unmute` `!clear`' },
-                { name: '🎮 Мини-игры', value: '`!random` `!rps` `!roulette`' },
-                { name: '🎵 Музыка', value: 'Используй `m!play` (Jockie Music бот)' },
-                { name: '🎉 Розыгрыши', value: '`!giveaway`' },
-                { name: '📊 Опросы', value: '`!poll`' },
-                { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
-                { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!modcommands` `!help`' },
-                { name: '🎮 Новости', value: '`!gamenews` `!news`' },
-                { name: '⚔️ League of Legends', value: '`!tierlist` `!top` `!builds` `!rating` `!counter` `!lolnews` `!lolhelp`' },
-                { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
+                { name: 'рџ›ЎпёЏ РњРѕРґРµСЂР°С†РёСЏ', value: '`!kick` `!ban` `!unban` `!mute` `!unmute` `!clear`' },
+                { name: 'рџЋ® РњРёРЅРё-РёРіСЂС‹', value: '`!random` `!rps` `!roulette`' },
+                { name: 'рџЋµ РњСѓР·С‹РєР°', value: 'РСЃРїРѕР»СЊР·СѓР№ `m!play` (Jockie Music Р±РѕС‚)' },
+                { name: 'рџЋ‰ Р РѕР·С‹РіСЂС‹С€Рё', value: '`!giveaway`' },
+                { name: 'рџ“Љ РћРїСЂРѕСЃС‹', value: '`!poll`' },
+                { name: 'рџЋ­ Р РѕР»Рё', value: '`!reactrole` `!verify`' },
+                { name: 'вљ™пёЏ РЎРµСЂРІРµСЂ', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!modcommands` `!help`' },
+                { name: 'рџЋ® РќРѕРІРѕСЃС‚Рё', value: '`!gamenews` `!news`' },
+                { name: 'вљ”пёЏ League of Legends', value: '`!tierlist` `!top` `!builds` `!rating` `!counter` `!lolnews` `!lolhelp`' },
+                { name: 'рџ¤– РђРІС‚Рѕ', value: 'РђРЅС‚Рё-СЃРїР°Рј, РђРЅС‚Рё-СЃСЃС‹Р»РєРё, Р›РѕРіРёСЂРѕРІР°РЅРёРµ, РџСЂРёРІРµС‚СЃС‚РІРёРµ/РџСЂРѕС‰Р°РЅРёРµ' }
             )
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
 });
 
-// --- РОЛИ ПО РЕАКЦИЯМ ---
+// --- Р РћР›Р РџРћ Р Р•РђРљР¦РРЇРњ ---
 
 commands.set('reactrole', {
     name: 'reactrole',
-    description: 'Создать сообщение с ролями по реакциям',
-    usage: '!reactrole #канал | Роль1:эмодзи | Роль2:эмодзи',
+    description: 'РЎРѕР·РґР°С‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ СЃ СЂРѕР»СЏРјРё РїРѕ СЂРµР°РєС†РёСЏРј',
+    usage: '!reactrole #РєР°РЅР°Р» | Р РѕР»СЊ1:СЌРјРѕРґР·Рё | Р РѕР»СЊ2:СЌРјРѕРґР·Рё',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может настраивать роли по реакциям!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ РЅР°СЃС‚СЂР°РёРІР°С‚СЊ СЂРѕР»Рё РїРѕ СЂРµР°РєС†РёСЏРј!');
         }
 
         const fullArgs = args.join(' ');
         const parts = fullArgs.split('|').map(p => p.trim());
-        if (parts.length < 2) return message.reply('❌ Формат: !reactrole # канал | Роль1:🎭 | Роль2:🎮');
+        if (parts.length < 2) return message.reply('вќЊ Р¤РѕСЂРјР°С‚: !reactrole # РєР°РЅР°Р» | Р РѕР»СЊ1:рџЋ­ | Р РѕР»СЊ2:рџЋ®');
 
         const channelMention = parts[0];
         const channel = message.mentions.channels.first() || message.guild.channels.cache.find(ch => ch.name === channelMention.replace('#', ''));
-        if (!channel) return message.reply('❌ Канал не найден!');
+        if (!channel) return message.reply('вќЊ РљР°РЅР°Р» РЅРµ РЅР°Р№РґРµРЅ!');
 
         const rolePairs = parts.slice(1);
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle('🎭 Выбери роль!')
-            .setDescription('Нажми на эмодзи чтобы получить роль:')
+            .setTitle('рџЋ­ Р’С‹Р±РµСЂРё СЂРѕР»СЊ!')
+            .setDescription('РќР°Р¶РјРё РЅР° СЌРјРѕРґР·Рё С‡С‚РѕР±С‹ РїРѕР»СѓС‡РёС‚СЊ СЂРѕР»СЊ:')
             .setTimestamp();
 
         const description = [];
@@ -1813,7 +1810,7 @@ commands.set('reactrole', {
             const [roleName, emoji] = pair.split(':').map(s => s.trim());
             const role = message.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
             if (role) {
-                description.push(`${emoji} — ${role}`);
+                description.push(`${emoji} вЂ” ${role}`);
             }
         }
         embed.setDescription(description.join('\n'));
@@ -1828,40 +1825,40 @@ commands.set('reactrole', {
             }
         }
 
-        message.reply('✅ Роли по реакциям созданы!');
+        message.reply('вњ… Р РѕР»Рё РїРѕ СЂРµР°РєС†РёСЏРј СЃРѕР·РґР°РЅС‹!');
     }
 });
 
-// --- РОЗЫГРЫШИ ---
+// --- Р РћР—Р«Р“Р Р«РЁР ---
 
 const giveaways = new Map();
 
 commands.set('giveaway', {
     name: 'giveaway',
-    description: 'Создать розыгрыш',
-    usage: '!giveaway 60 | Приз | Описание',
+    description: 'РЎРѕР·РґР°С‚СЊ СЂРѕР·С‹РіСЂС‹С€',
+    usage: '!giveaway 60 | РџСЂРёР· | РћРїРёСЃР°РЅРёРµ',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может создавать розыгрыши!');
+            return message.reply('вќЊ РўРѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ СЃРѕР·РґР°РІР°С‚СЊ СЂРѕР·С‹РіСЂС‹С€Рё!');
         }
 
         const fullArgs = args.join(' ');
         const parts = fullArgs.split('|').map(p => p.trim());
-        if (parts.length < 2) return message.reply('❌ Формат: !giveaway 60 | Приз | Описание');
+        if (parts.length < 2) return message.reply('вќЊ Р¤РѕСЂРјР°С‚: !giveaway 60 | РџСЂРёР· | РћРїРёСЃР°РЅРёРµ');
 
         const time = parseInt(parts[0]) * 1000;
         const prize = parts[1];
-        const description = parts[2] || 'Участвуй!';
+        const description = parts[2] || 'РЈС‡Р°СЃС‚РІСѓР№!';
 
         const embed = new EmbedBuilder()
             .setColor(0xffd700)
-            .setTitle('🎉 РОЗЫГРЫШ!')
-            .setDescription(`**Приз:** ${prize}\n\n${description}\n\n⏰ Заканчивается через: ${Math.floor(time / 60000)} мин.`)
-            .setFooter({ text: 'Нажми 🎉 чтобы участвовать!' })
+            .setTitle('рџЋ‰ Р РћР—Р«Р“Р Р«РЁ!')
+            .setDescription(`**РџСЂРёР·:** ${prize}\n\n${description}\n\nвЏ° Р—Р°РєР°РЅС‡РёРІР°РµС‚СЃСЏ С‡РµСЂРµР·: ${Math.floor(time / 60000)} РјРёРЅ.`)
+            .setFooter({ text: 'РќР°Р¶РјРё рџЋ‰ С‡С‚РѕР±С‹ СѓС‡Р°СЃС‚РІРѕРІР°С‚СЊ!' })
             .setTimestamp();
 
         const msg = await message.channel.send({ embeds: [embed] });
-        await msg.react('🎉');
+        await msg.react('рџЋ‰');
 
         giveaways.set(msg.id, {
             prize,
@@ -1871,31 +1868,31 @@ commands.set('giveaway', {
             guildId: message.guild.id,
         });
 
-        message.reply(`✅ Розыгрыш создан! Заканчивается через ${Math.floor(time / 60000)} мин.`);
+        message.reply(`вњ… Р РѕР·С‹РіСЂС‹С€ СЃРѕР·РґР°РЅ! Р—Р°РєР°РЅС‡РёРІР°РµС‚СЃСЏ С‡РµСЂРµР· ${Math.floor(time / 60000)} РјРёРЅ.`);
     }
 });
 
-// --- ОПРОСЫ ---
+// --- РћРџР РћРЎР« ---
 
 commands.set('poll', {
     name: 'poll',
-    description: 'Создать опрос',
-    usage: '!poll Вопрос | Вариант1 | Вариант2',
+    description: 'РЎРѕР·РґР°С‚СЊ РѕРїСЂРѕСЃ',
+    usage: '!poll Р’РѕРїСЂРѕСЃ | Р’Р°СЂРёР°РЅС‚1 | Р’Р°СЂРёР°РЅС‚2',
     async execute(message, args) {
         const fullArgs = args.join(' ');
         const parts = fullArgs.split('|').map(p => p.trim());
-        if (parts.length < 2) return message.reply('❌ Формат: !poll Вопрос | Вариант1 | Вариант2');
+        if (parts.length < 2) return message.reply('вќЊ Р¤РѕСЂРјР°С‚: !poll Р’РѕРїСЂРѕСЃ | Р’Р°СЂРёР°РЅС‚1 | Р’Р°СЂРёР°РЅС‚2');
 
         const question = parts[0];
         const options = parts.slice(1);
-        const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+        const emojis = ['1пёЏвѓЈ', '2пёЏвѓЈ', '3пёЏвѓЈ', '4пёЏвѓЈ', '5пёЏвѓЈ', '6пёЏвѓЈ', '7пёЏвѓЈ', '8пёЏвѓЈ', '9пёЏвѓЈ', 'рџ”џ'];
 
         const description = options.map((opt, i) => `${emojis[i]} ${opt}`).join('\n');
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
-            .setTitle(`📊 ${question}`)
+            .setTitle(`рџ“Љ ${question}`)
             .setDescription(description)
-            .setFooter({ text: `Опрос от ${message.author.tag}` })
+            .setFooter({ text: `РћРїСЂРѕСЃ РѕС‚ ${message.author.tag}` })
             .setTimestamp();
 
         const msg = await message.channel.send({ embeds: [embed] });
@@ -1908,26 +1905,26 @@ commands.set('poll', {
     }
 });
 
-// --- ПРОЩАНИЕ ---
+// --- РџР РћР©РђРќРР• ---
 
-// --- АВТО-АНМАТ (РЕАКЦИИ) ---
+// --- РђР’РўРћ-РђРќРњРђРў (Р Р•РђРљР¦РР) ---
 
-// ==================== СОБЫТИЯ ====================
+// ==================== РЎРћР‘Р«РўРРЇ ====================
 
 client.on('ready', () => {
-    console.log(`✅ Бот ${client.user.tag} запущен!`);
-    client.user.setActivity('!help | Сервер ZOHAN', { type: ActivityType.Playing });
+    console.log(`вњ… Р‘РѕС‚ ${client.user.tag} Р·Р°РїСѓС‰РµРЅ!`);
+    client.user.setActivity('!help | РЎРµСЂРІРµСЂ ZOHAN', { type: ActivityType.Playing });
 
-    // Запуск Telegram бота (если настроен)
+    // Р—Р°РїСѓСЃРє Telegram Р±РѕС‚Р° (РµСЃР»Рё РЅР°СЃС‚СЂРѕРµРЅ)
     if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
         telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
-        console.log('✅ Telegram бот запущен!');
+        console.log('вњ… Telegram Р±РѕС‚ Р·Р°РїСѓС‰РµРЅ!');
 
-        // Обработка сообщений из Telegram → Discord
+        // РћР±СЂР°Р±РѕС‚РєР° СЃРѕРѕР±С‰РµРЅРёР№ РёР· Telegram в†’ Discord
         telegramBot.on('message', async (msg) => {
             if (msg.from.is_bot) return;
 
-            // Ищем канал для Telegram сообщений
+            // РС‰РµРј РєР°РЅР°Р» РґР»СЏ Telegram СЃРѕРѕР±С‰РµРЅРёР№
             for (const [, guild] of client.guilds.cache) {
                 const tgChannel = guild.channels.cache.find(ch =>
                     ch.name.includes('telegram') || ch.name.includes('tg')
@@ -1935,111 +1932,129 @@ client.on('ready', () => {
                 if (tgChannel) {
                     const embed = new EmbedBuilder()
                         .setColor(0x0099ff)
-                        .setTitle('📱 Telegram')
+                        .setTitle('рџ“± Telegram')
                         .setDescription(`**${msg.from.first_name || msg.from.username}**: ${msg.text}`)
-                        .setFooter({ text: 'Telegram → Discord' })
+                        .setFooter({ text: 'Telegram в†’ Discord' })
                         .setTimestamp();
                     await tgChannel.send({ embeds: [embed] }).catch(() => {});
                 }
             }
         });
 
-        // Отправляем приветствие
-        sendToTelegram('✅ Бот Discord запущен и связан с сервером!');
+        // РћС‚РїСЂР°РІР»СЏРµРј РїСЂРёРІРµС‚СЃС‚РІРёРµ
+        sendToTelegram('вњ… Р‘РѕС‚ Discord Р·Р°РїСѓС‰РµРЅ Рё СЃРІСЏР·Р°РЅ СЃ СЃРµСЂРІРµСЂРѕРј!');
     }
 
-    // ==================== РАСПИСАНИЕ ОБНОВЛЕНИЙ ====================
+    // ==================== Р РђРЎРџРРЎРђРќРР• РћР‘РќРћР’Р›Р•РќРР™ ====================
 
-    // Функция проверки времени
+    // Р¤СѓРЅРєС†РёСЏ РїСЂРѕРІРµСЂРєРё РІСЂРµРјРµРЅРё
     function isUpdateHour(hours) {
         const now = new Date().getHours();
         return hours.includes(now);
     }
 
-    // 📰 ИГРОВЫЕ НОВОСТИ - каждые 4 часа (10:00, 14:00, 18:00, 22:00)
+    // рџ“° РР“Р РћР’Р«Р• РќРћР’РћРЎРўР - РєР°Р¶РґС‹Рµ 4 С‡Р°СЃР° (10:00, 14:00, 18:00, 22:00)
     const newsHours = [10, 14, 18, 22];
-    console.log(`📰 Игровые новости: ${newsHours.join(':00, ')}:00`);
+    console.log(`рџ“° РРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё: ${newsHours.join(':00, ')}:00`);
 
-    // ⚔️ LOL TIER LIST - каждые 6 часов (09:00, 15:00, 21:00)
+    // вљ”пёЏ LOL TIER LIST - РєР°Р¶РґС‹Рµ 6 С‡Р°СЃРѕРІ (09:00, 15:00, 21:00)
     const tierListHours = [9, 15, 21];
-    console.log(`⚔️ LOL Tier List: ${tierListHours.join(':00, ')}:00`);
+    console.log(`вљ”пёЏ LOL Tier List: ${tierListHours.join(':00, ')}:00`);
 
-    // 🛡 LOL СБОРКИ - каждые 8 часов (10:00, 18:00)
+    // рџ›Ў LOL РЎР‘РћР РљР - РєР°Р¶РґС‹Рµ 8 С‡Р°СЃРѕРІ (10:00, 18:00)
     const buildsHours = [10, 18];
-    console.log(`🛡 LOL Сборки: ${buildsHours.join(':00, ')}:00`);
+    console.log(`рџ›Ў LOL РЎР±РѕСЂРєРё: ${buildsHours.join(':00, ')}:00`);
 
-    // 🏆 LOL РЕЙТИНГ - каждые 12 часов (12:00, 00:00)
+    // рџЏ† LOL Р Р•Р™РўРРќР“ - РєР°Р¶РґС‹Рµ 12 С‡Р°СЃРѕРІ (12:00, 00:00)
     const ratingHours = [0, 12];
-    console.log(`🏆 LOL Рейтинг: ${ratingHours.join(':00, ')}:00`);
+    console.log(`рџЏ† LOL Р РµР№С‚РёРЅРі: ${ratingHours.join(':00, ')}:00`);
 
-    // Проверяем каждые 30 минут
+    // РџСЂРѕРІРµСЂСЏРµРј РєР°Р¶РґС‹Рµ 30 РјРёРЅСѓС‚
     setInterval(async () => {
         const currentHour = new Date().getHours();
-        console.log(`⏰ Проверяю время: ${currentHour}:00`);
+        const currentMinute = new Date().getMinutes();
 
-        // 🔴 Проверяем Twitch стримы каждые 5 минут
+        // Очистка дедупликации LOL раз в сутки (в 00:05)
+        if (currentHour === 0 && currentMinute < 5) {
+            publishedLoLNews.clear();
+            console.log('Очищен publishedLoLNews');
+        }
+        console.log(`вЏ° РџСЂРѕРІРµСЂСЏСЋ РІСЂРµРјСЏ: ${currentHour}:00`);
+
+        // рџ”ґ РџСЂРѕРІРµСЂСЏРµРј Twitch СЃС‚СЂРёРјС‹ РєР°Р¶РґС‹Рµ 5 РјРёРЅСѓС‚
         await checkTwitchStreams(client);
 
-        // 📰 Игровые новости
+        // рџ“° РРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё
         if (newsHours.includes(currentHour)) {
-            console.log('📰 Обновляю игровые новости...');
+            console.log('рџ“° РћР±РЅРѕРІР»СЏСЋ РёРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё...');
             await postNewsToChannel(client);
         }
 
-        // 🎮 LOL новости (в канал lol-новости)
+        // рџЋ® LOL РЅРѕРІРѕСЃС‚Рё (РІ РєР°РЅР°Р» lol-РЅРѕРІРѕСЃС‚Рё)
         if (newsHours.includes(currentHour)) {
-            console.log('🎮 Обновляю LOL новости...');
+            console.log('рџЋ® РћР±РЅРѕРІР»СЏСЋ LOL РЅРѕРІРѕСЃС‚Рё...');
             for (const [, guild] of client.guilds.cache) {
                 const lolNewsChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-новости') || ch.name.includes('lol-novosti')
+                    ch.name.includes('lol-РЅРѕРІРѕСЃС‚Рё') || ch.name.includes('lol-novosti')
                 );
                 if (lolNewsChannel) {
-                    console.log('🎮 Канал LOL новостей найден:', lolNewsChannel.name);
+                    console.log('рџЋ® РљР°РЅР°Р» LOL РЅРѕРІРѕСЃС‚РµР№ РЅР°Р№РґРµРЅ:', lolNewsChannel.name);
                     const lolNews = await fetchLoLNews();
-                    console.log('🎮 Получено LOL новостей:', lolNews.length);
+                    console.log('рџЋ® РџРѕР»СѓС‡РµРЅРѕ LOL РЅРѕРІРѕСЃС‚РµР№:', lolNews.length);
+                                        // Собираем embed в массив, проверяем дубли
+                    const embeds = [];
                     for (const item of lolNews) {
+                        const newsId = `${item.source}-${item.title}`;
+                        if (publishedLoLNews.has(newsId)) continue;
+
                         const embed = new EmbedBuilder()
                             .setColor(0xffd700)
                             .setTitle(`${item.emoji} ${item.title}`)
-                            .setDescription(item.content.substring(0, 400) + (item.content.length > 400 ? '...' : ''))
+                            .setDescription(item.content.substring(0, 400) + (item.content.length > 400 ? "... ..." : ""))
                             .addFields(
-                                { name: '📰 Источник', value: item.source, inline: true }
+                                { name: "Источник", value: item.source, inline: true }
                             )
                             .setURL(item.link)
                             .setTimestamp();
                         if (item.image) {
                             try { embed.setImage(item.image); } catch (e) {}
                         }
-                        await lolNewsChannel.send({ embeds: [embed] }).catch(() => {});
-                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        embeds.push(embed);
+                        publishedLoLNews.add(newsId);
                     }
-                }
-            }
-        }
+                    // Отправляем пакетом по 10 (1 уведомление)
+                    for (let i = 0; i < embeds.length; i += 10) {
+                        const batch = embeds.slice(i, i + 10);
+                        await lolNewsChannel.send({ embeds: batch }).catch(() => {});
+                        if (i + 10 < embeds.length) {
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
+                    }
+                    console.log(`✅ LOL: опубликовано ${embeds.length} новостей (${Math.ceil(embeds.length / 10)} сообщений)`);
 
-        // ⚔️ LOL Tier List (в канал lol-гайды)
+        // вљ”пёЏ LOL Tier List (РІ РєР°РЅР°Р» lol-РіР°Р№РґС‹)
         if (tierListHours.includes(currentHour)) {
-            console.log('⚔️ Обновляю LOL Tier List...');
+            console.log('вљ”пёЏ РћР±РЅРѕРІР»СЏСЋ LOL Tier List...');
             for (const [, guild] of client.guilds.cache) {
                 const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
+                    ch.name.includes('lol-РіР°Р№РґС‹') || ch.name.includes('lol-gajdy')
                 );
                 if (lolGuidesChannel) {
-                    console.log('⚔️ Канал найден:', lolGuidesChannel.name);
+                    console.log('вљ”пёЏ РљР°РЅР°Р» РЅР°Р№РґРµРЅ:', lolGuidesChannel.name);
                     await lolGuidesChannel.send({ embeds: [createTierListEmbed()] }).catch(() => {});
                 }
             }
         }
 
-        // 🛡 LOL Сборки (в канал lol-гайды)
+        // рџ›Ў LOL РЎР±РѕСЂРєРё (РІ РєР°РЅР°Р» lol-РіР°Р№РґС‹)
         if (buildsHours.includes(currentHour)) {
-            console.log('🛡 Обновляю LOL Сборки...');
+            console.log('рџ›Ў РћР±РЅРѕРІР»СЏСЋ LOL РЎР±РѕСЂРєРё...');
             for (const [, guild] of client.guilds.cache) {
                 const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
+                    ch.name.includes('lol-РіР°Р№РґС‹') || ch.name.includes('lol-gajdy')
                 );
                 if (lolGuidesChannel) {
-                    console.log('🛡 Канал найден:', lolGuidesChannel.name);
+                    console.log('рџ›Ў РљР°РЅР°Р» РЅР°Р№РґРµРЅ:', lolGuidesChannel.name);
                     await lolGuidesChannel.send({ embeds: [createBuildsEmbed('mid')] }).catch(() => {});
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     await lolGuidesChannel.send({ embeds: [createBuildsEmbed('adc')] }).catch(() => {});
@@ -2047,21 +2062,21 @@ client.on('ready', () => {
             }
         }
 
-        // 🏆 LOL Рейтинг (в канал lol-гайды)
+        // рџЏ† LOL Р РµР№С‚РёРЅРі (РІ РєР°РЅР°Р» lol-РіР°Р№РґС‹)
         if (ratingHours.includes(currentHour)) {
-            console.log('🏆 Обновляю LOL Рейтинг...');
+            console.log('рџЏ† РћР±РЅРѕРІР»СЏСЋ LOL Р РµР№С‚РёРЅРі...');
             for (const [, guild] of client.guilds.cache) {
                 const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
+                    ch.name.includes('lol-РіР°Р№РґС‹') || ch.name.includes('lol-gajdy')
                 );
                 if (lolGuidesChannel) {
-                    console.log('🏆 Канал найден:', lolGuidesChannel.name);
+                    console.log('рџЏ† РљР°РЅР°Р» РЅР°Р№РґРµРЅ:', lolGuidesChannel.name);
                     await lolGuidesChannel.send({ embeds: [createRatingEmbed()] }).catch(() => {});
                 }
             }
         }
 
-    }, 30 * 60 * 1000); // Проверяем каждые 30 минут
+    }, 30 * 60 * 1000); // РџСЂРѕРІРµСЂСЏРµРј РєР°Р¶РґС‹Рµ 30 РјРёРЅСѓС‚
 });
 
 client.on('messageCreate', async (message) => {
@@ -2078,24 +2093,24 @@ client.on('messageCreate', async (message) => {
         await command.execute(message, args);
     } catch (error) {
         console.error(error);
-        message.reply('❌ Произошла ошибка при выполнении команды!');
+        message.reply('вќЊ РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР° РїСЂРё РІС‹РїРѕР»РЅРµРЅРёРё РєРѕРјР°РЅРґС‹!');
     }
 });
 
-// Приветствие новых участников
+// РџСЂРёРІРµС‚СЃС‚РІРёРµ РЅРѕРІС‹С… СѓС‡Р°СЃС‚РЅРёРєРѕРІ
 client.on('guildMemberAdd', async (member) => {
     const channel = member.guild.channels.cache.find(ch => ch.name === process.env.WELCOME_CHANNEL);
     if (channel) {
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
-            .setTitle('👋 Добро пожаловать!')
-            .setDescription(`Привет, ${member}! Добро пожаловать на сервер **${member.guild.name}**!`)
+            .setTitle('рџ‘‹ Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ!')
+            .setDescription(`РџСЂРёРІРµС‚, ${member}! Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ РЅР° СЃРµСЂРІРµСЂ **${member.guild.name}**!`)
             .addFields(
-                { name: '🎮 Игровые новости', value: 'Загляни в канал **#🎮-новости** — там последние игровые новости!', inline: false },
-                { name: '⚔️ LOL Гайды', value: 'Играешь в LOL? Смотри **#⚔️-lol-гайды** — Tier List, сборки, рейтинги!', inline: false },
-                { name: '📜 Команды', value: 'Напиши `!help` чтобы узнать все команды бота!', inline: false },
-                { name: 'Участников', value: `${member.guild.memberCount}`, inline: true },
-                { name: 'Создан', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
+                { name: 'рџЋ® РРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё', value: 'Р—Р°РіР»СЏРЅРё РІ РєР°РЅР°Р» **#рџЋ®-РЅРѕРІРѕСЃС‚Рё** вЂ” С‚Р°Рј РїРѕСЃР»РµРґРЅРёРµ РёРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё!', inline: false },
+                { name: 'вљ”пёЏ LOL Р“Р°Р№РґС‹', value: 'РРіСЂР°РµС€СЊ РІ LOL? РЎРјРѕС‚СЂРё **#вљ”пёЏ-lol-РіР°Р№РґС‹** вЂ” Tier List, СЃР±РѕСЂРєРё, СЂРµР№С‚РёРЅРіРё!', inline: false },
+                { name: 'рџ“њ РљРѕРјР°РЅРґС‹', value: 'РќР°РїРёС€Рё `!help` С‡С‚РѕР±С‹ СѓР·РЅР°С‚СЊ РІСЃРµ РєРѕРјР°РЅРґС‹ Р±РѕС‚Р°!', inline: false },
+                { name: 'РЈС‡Р°СЃС‚РЅРёРєРѕРІ', value: `${member.guild.memberCount}`, inline: true },
+                { name: 'РЎРѕР·РґР°РЅ', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
             )
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
             .setTimestamp();
@@ -2111,16 +2126,16 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
-// ПРОЩАНИЕ участников
+// РџР РћР©РђРќРР• СѓС‡Р°СЃС‚РЅРёРєРѕРІ
 client.on('guildMemberRemove', async (member) => {
-    const logChannel = member.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    const logChannel = member.guild.channels.cache.find(ch => ch.name === 'рџ“‹-Р»РѕРіРё');
     if (logChannel) {
         const embed = new EmbedBuilder()
             .setColor(0xff0000)
-            .setTitle('👋 Участник покинул сервер')
-            .setDescription(`**${member.user.tag}** вышел с сервера`)
+            .setTitle('рџ‘‹ РЈС‡Р°СЃС‚РЅРёРє РїРѕРєРёРЅСѓР» СЃРµСЂРІРµСЂ')
+            .setDescription(`**${member.user.tag}** РІС‹С€РµР» СЃ СЃРµСЂРІРµСЂР°`)
             .addFields(
-                { name: 'Участников осталось', value: `${member.guild.memberCount}`, inline: true }
+                { name: 'РЈС‡Р°СЃС‚РЅРёРєРѕРІ РѕСЃС‚Р°Р»РѕСЃСЊ', value: `${member.guild.memberCount}`, inline: true }
             )
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
             .setTimestamp();
@@ -2128,76 +2143,76 @@ client.on('guildMemberRemove', async (member) => {
     }
 });
 
-// ЛОГИРОВАНИЕ: удалённые сообщения
+// Р›РћР“РР РћР’РђРќРР•: СѓРґР°Р»С‘РЅРЅС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ
 client.on('messageDelete', async (message) => {
     if (message.author.bot) return;
-    const logChannel = message.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    const logChannel = message.guild.channels.cache.find(ch => ch.name === 'рџ“‹-Р»РѕРіРё');
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
         .setColor(0xffa500)
-        .setTitle('🗑️ Сообщение удалено')
+        .setTitle('рџ—‘пёЏ РЎРѕРѕР±С‰РµРЅРёРµ СѓРґР°Р»РµРЅРѕ')
         .addFields(
-            { name: 'Автор', value: `${message.author.tag}`, inline: true },
-            { name: 'Канал', value: `${message.channel}`, inline: true },
-            { name: 'Контент', value: message.content.substring(0, 1000) || 'Нет текста' }
+            { name: 'РђРІС‚РѕСЂ', value: `${message.author.tag}`, inline: true },
+            { name: 'РљР°РЅР°Р»', value: `${message.channel}`, inline: true },
+            { name: 'РљРѕРЅС‚РµРЅС‚', value: message.content.substring(0, 1000) || 'РќРµС‚ С‚РµРєСЃС‚Р°' }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
 });
 
-// ЛОГИРОВАНИЕ: edited сообщения
+// Р›РћР“РР РћР’РђРќРР•: edited СЃРѕРѕР±С‰РµРЅРёСЏ
 client.on('messageUpdate', async (oldMessage, newMessage) => {
     if (oldMessage.author.bot) return;
     if (oldMessage.content === newMessage.content) return;
-    const logChannel = oldMessage.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    const logChannel = oldMessage.guild.channels.cache.find(ch => ch.name === 'рџ“‹-Р»РѕРіРё');
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle('✏️ Сообщение изменено')
+        .setTitle('вњЏпёЏ РЎРѕРѕР±С‰РµРЅРёРµ РёР·РјРµРЅРµРЅРѕ')
         .addFields(
-            { name: 'Автор', value: `${oldMessage.author.tag}`, inline: true },
-            { name: 'Канал', value: `${oldMessage.channel}`, inline: true },
-            { name: 'Было', value: oldMessage.content.substring(0, 500) || 'Нет текста' },
-            { name: 'Стало', value: newMessage.content.substring(0, 500) || 'Нет текста' }
+            { name: 'РђРІС‚РѕСЂ', value: `${oldMessage.author.tag}`, inline: true },
+            { name: 'РљР°РЅР°Р»', value: `${oldMessage.channel}`, inline: true },
+            { name: 'Р‘С‹Р»Рѕ', value: oldMessage.content.substring(0, 500) || 'РќРµС‚ С‚РµРєСЃС‚Р°' },
+            { name: 'РЎС‚Р°Р»Рѕ', value: newMessage.content.substring(0, 500) || 'РќРµС‚ С‚РµРєСЃС‚Р°' }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
 });
 
-// ЛОГИРОВАНИЕ: бан/кик
+// Р›РћР“РР РћР’РђРќРР•: Р±Р°РЅ/РєРёРє
 client.on('guildBanAdd', async (ban) => {
-    const logChannel = ban.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    const logChannel = ban.guild.channels.cache.find(ch => ch.name === 'рџ“‹-Р»РѕРіРё');
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
         .setColor(0xff0000)
-        .setTitle('🔨 Участник забанен')
+        .setTitle('рџ”Ё РЈС‡Р°СЃС‚РЅРёРє Р·Р°Р±Р°РЅРµРЅ')
         .addFields(
-            { name: 'Пользователь', value: `${ban.user.tag}`, inline: true },
-            { name: 'Причина', value: ban.reason || 'Не указана', inline: true }
+            { name: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ', value: `${ban.user.tag}`, inline: true },
+            { name: 'РџСЂРёС‡РёРЅР°', value: ban.reason || 'РќРµ СѓРєР°Р·Р°РЅР°', inline: true }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
 });
 
-// ЛОГИРОВАНИЕ: разбан
+// Р›РћР“РР РћР’РђРќРР•: СЂР°Р·Р±Р°РЅ
 client.on('guildBanRemove', async (ban) => {
-    const logChannel = ban.guild.channels.cache.find(ch => ch.name === '📋-логи');
+    const logChannel = ban.guild.channels.cache.find(ch => ch.name === 'рџ“‹-Р»РѕРіРё');
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
         .setColor(0x00ff00)
-        .setTitle('✅ Участник разбанен')
+        .setTitle('вњ… РЈС‡Р°СЃС‚РЅРёРє СЂР°Р·Р±Р°РЅРµРЅ')
         .addFields(
-            { name: 'Пользователь', value: `${ban.user.tag}`, inline: true }
+            { name: 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ', value: `${ban.user.tag}`, inline: true }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
 });
 
-// АНТИ-СПАМ и АНТИ-ССЫЛКИ
+// РђРќРўР-РЎРџРђРњ Рё РђРќРўР-РЎРЎР«Р›РљР
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
     if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
@@ -2205,7 +2220,7 @@ client.on('messageCreate', async (message) => {
     const userId = message.author.id;
     const now = Date.now();
 
-    // Анти-спам
+    // РђРЅС‚Рё-СЃРїР°Рј
     if (!spamTracker.has(userId)) spamTracker.set(userId, []);
     const timestamps = spamTracker.get(userId);
     timestamps.push(now);
@@ -2217,18 +2232,18 @@ client.on('messageCreate', async (message) => {
             await message.delete();
             const mute = message.guild.roles.cache.find(r => r.name === 'Muted');
             if (mute) await message.member.roles.add(mute);
-            const warn = await message.channel.send(`⚠️ ${message.author}, замучен на 1 минуту за спам!`);
+            const warn = await message.channel.send(`вљ пёЏ ${message.author}, Р·Р°РјСѓС‡РµРЅ РЅР° 1 РјРёРЅСѓС‚Сѓ Р·Р° СЃРїР°Рј!`);
             setTimeout(() => {
                 if (mute) message.member.roles.remove(mute).catch(() => {});
             }, 60000);
             setTimeout(() => warn.delete(), 8000);
 
-            const logChannel = message.guild.channels.cache.find(ch => ch.name === '📋-логи');
+            const logChannel = message.guild.channels.cache.find(ch => ch.name === 'рџ“‹-Р»РѕРіРё');
             if (logChannel) {
                 const embed = new EmbedBuilder()
                     .setColor(0xffa500)
-                    .setTitle('⚠️ Анти-спам')
-                    .setDescription(`${message.author.tag} замучен на 1 минуту за спам`)
+                    .setTitle('вљ пёЏ РђРЅС‚Рё-СЃРїР°Рј')
+                    .setDescription(`${message.author.tag} Р·Р°РјСѓС‡РµРЅ РЅР° 1 РјРёРЅСѓС‚Сѓ Р·Р° СЃРїР°Рј`)
                     .setTimestamp();
                 logChannel.send({ embeds: [embed] });
             }
@@ -2236,25 +2251,25 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // Предупреждение за спам
+    // РџСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµ Р·Р° СЃРїР°Рј
     if (recent.length === SPAM_LIMIT - 1) {
-        const warn = await message.channel.send(`⚠️ ${message.author}, замедли! Следующее сообщение = мут.`);
+        const warn = await message.channel.send(`вљ пёЏ ${message.author}, Р·Р°РјРµРґР»Рё! РЎР»РµРґСѓСЋС‰РµРµ СЃРѕРѕР±С‰РµРЅРёРµ = РјСѓС‚.`);
         setTimeout(() => warn.delete(), 4000);
     }
 
-    // Анти-ссылки (разрешены в каналах: игры, музыка, бот-команды)
-    const allowedChannels = ['🎮-игры', '🎵-музыка', '👋-общение', 'общее'];
+    // РђРЅС‚Рё-СЃСЃС‹Р»РєРё (СЂР°Р·СЂРµС€РµРЅС‹ РІ РєР°РЅР°Р»Р°С…: РёРіСЂС‹, РјСѓР·С‹РєР°, Р±РѕС‚-РєРѕРјР°РЅРґС‹)
+    const allowedChannels = ['рџЋ®-РёРіСЂС‹', 'рџЋµ-РјСѓР·С‹РєР°', 'рџ‘‹-РѕР±С‰РµРЅРёРµ', 'РѕР±С‰РµРµ'];
     const urlRegex = /https?:\/\/[^\s]+|www\.[^\s]+/i;
     if (urlRegex.test(message.content) && !allowedChannels.includes(message.channel.name)) {
         try {
             await message.delete();
-            const warn = await message.channel.send(`🚫 ${message.author}, ссылки запрещены в этом канале!`);
+            const warn = await message.channel.send(`рџљ« ${message.author}, СЃСЃС‹Р»РєРё Р·Р°РїСЂРµС‰РµРЅС‹ РІ СЌС‚РѕРј РєР°РЅР°Р»Рµ!`);
             setTimeout(() => warn.delete(), 3000);
         } catch (err) {}
     }
 });
 
-// РЕАКЦИИ: обработка Reaction Roles и Верификация
+// Р Р•РђРљР¦РР: РѕР±СЂР°Р±РѕС‚РєР° Reaction Roles Рё Р’РµСЂРёС„РёРєР°С†РёСЏ
 client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
     if (reaction.message.partial) await reaction.message.fetch();
@@ -2262,18 +2277,18 @@ client.on('messageReactionAdd', async (reaction, user) => {
     const guild = reaction.message.guild;
     const member = guild.members.cache.get(user.id);
 
-    // Верификация
-    if (reaction.emoji.name === '✅') {
+    // Р’РµСЂРёС„РёРєР°С†РёСЏ
+    if (reaction.emoji.name === 'вњ…') {
         const verifiedRole = guild.roles.cache.find(r => r.name === 'Verified');
         if (verifiedRole && !member.roles.cache.has(verifiedRole.id)) {
             await member.roles.add(verifiedRole).catch(() => {});
-            const ch = guild.channels.cache.find(ch => ch.name === '👋-общение');
-            if (ch) ch.send(`✅ ${member} верифицирован! Добро пожаловать!`).then(m => setTimeout(() => m.delete(), 5000));
+            const ch = guild.channels.cache.find(ch => ch.name === 'рџ‘‹-РѕР±С‰РµРЅРёРµ');
+            if (ch) ch.send(`вњ… ${member} РІРµСЂРёС„РёС†РёСЂРѕРІР°РЅ! Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ!`).then(m => setTimeout(() => m.delete(), 5000));
         }
     }
 });
 
-// РОЗЫГРЫШИ: обработка таймеров
+// Р РћР—Р«Р“Р Р«РЁР: РѕР±СЂР°Р±РѕС‚РєР° С‚Р°Р№РјРµСЂРѕРІ
 setInterval(async () => {
     for (const [id, giveaway] of giveaways) {
         if (Date.now() >= giveaway.endTime) {
@@ -2285,9 +2300,9 @@ setInterval(async () => {
 
             try {
                 const msg = await channel.messages.fetch(giveaway.messageId);
-                const reactions = msg.reactions.cache.get('🎉');
+                const reactions = msg.reactions.cache.get('рџЋ‰');
                 if (!reactions) {
-                    await channel.send('🎉 Розыгрыш завершён, но никто не участвовал!');
+                    await channel.send('рџЋ‰ Р РѕР·С‹РіСЂС‹С€ Р·Р°РІРµСЂС€С‘РЅ, РЅРѕ РЅРёРєС‚Рѕ РЅРµ СѓС‡Р°СЃС‚РІРѕРІР°Р»!');
                     giveaways.delete(id);
                     continue;
                 }
@@ -2295,13 +2310,13 @@ setInterval(async () => {
                 const users = await reactions.users.fetch();
                 const participants = users.filter(u => !u.bot);
                 if (participants.size === 0) {
-                    await channel.send('🎉 Розыгрыш завершён, но никто не участвовал!');
+                    await channel.send('рџЋ‰ Р РѕР·С‹РіСЂС‹С€ Р·Р°РІРµСЂС€С‘РЅ, РЅРѕ РЅРёРєС‚Рѕ РЅРµ СѓС‡Р°СЃС‚РІРѕРІР°Р»!');
                 } else {
                     const winner = participants.random();
                     const embed = new EmbedBuilder()
                         .setColor(0xffd700)
-                        .setTitle('🎉 ПОБЕДИТЕЛЬ!')
-                        .setDescription(`**${winner}** выиграл **${giveaway.prize}**!`);
+                        .setTitle('рџЋ‰ РџРћР‘Р•Р”РРўР•Р›Р¬!')
+                        .setDescription(`**${winner}** РІС‹РёРіСЂР°Р» **${giveaway.prize}**!`);
                     await channel.send({ embeds: [embed] });
                 }
             } catch (err) {}
@@ -2311,6 +2326,8 @@ setInterval(async () => {
     }
 }, 10000);
 
-// ==================== ЗАПУСК ====================
+// ==================== Р—РђРџРЈРЎРљ ====================
 
 client.login(process.env.TOKEN);
+
+
