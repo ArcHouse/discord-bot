@@ -152,68 +152,6 @@ function isLoLContent(title, content) {
     return LOL_KEYWORDS.some(keyword => text.includes(keyword.toLowerCase()));
 }
 
-// ==================== TWITCH РЈР’Р•Р”РћРњР›Р•РќРРЇ ====================
-
-// Twitch РєР°РЅР°Р»С‹ РґР»СЏ РѕС‚СЃР»РµР¶РёРІР°РЅРёСЏ
-const TWITCH_CHANNELS = [
-    { name: 'BubaLeggg', login: 'bubaleggg' }
-];
-
-// РҐСЂР°РЅРёР»РёС‰Рµ СЃС‚Р°С‚СѓСЃР° СЃС‚СЂРёРјРѕРІ
-const streamStatus = new Map();
-
-// РџСЂРѕРІРµСЂРєР° СЃС‚СЂРёРјРѕРІ РЅР° Twitch
-async function checkTwitchStreams(client) {
-    for (const channel of TWITCH_CHANNELS) {
-        try {
-            // РСЃРїРѕР»СЊР·СѓРµРј РїСѓР±Р»РёС‡РЅС‹Р№ API РґР»СЏ РїСЂРѕРІРµСЂРєРё СЃС‚Р°С‚СѓСЃР°
-            const url = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${channel.login}-320x180.jpg`;
-            
-            // РџСЂРѕРІРµСЂСЏРµРј С‡РµСЂРµР· fetch
-            const response = await fetch(url, { method: 'HEAD' });
-            const isLive = response.ok;
-            
-            const wasLive = streamStatus.get(channel.login) || false;
-            
-            // Р•СЃР»Рё СЃС‚СЂРёРј РЅР°С‡Р°Р»СЃСЏ
-            if (isLive && !wasLive) {
-                console.log(`рџ”ґ ${channel.name} РЅР°С‡Р°Р» СЃС‚СЂРёРј!`);
-                
-                // РС‰РµРј РєР°РЅР°Р» РѕР±СЉСЏРІР»РµРЅРёСЏ
-                for (const [, guild] of client.guilds.cache) {
-                    const announceChannel = guild.channels.cache.find(ch => 
-                        ch.name.includes('РѕР±СЉСЏРІР»РµРЅРёСЏ') || ch.name.includes('announce')
-                    );
-                    if (announceChannel) {
-                        await announceChannel.send({ embeds: [
-                            new EmbedBuilder()
-                                .setColor(0x9146ff)
-                                .setTitle('рџ”ґ РЎРўР РРњ РќРђР§РђР›РЎРЇ!')
-                                .setDescription(`**${channel.name}** РЅР°С‡Р°Р» РїСЂСЏРјСѓСЋ С‚СЂР°РЅСЃР»СЏС†РёСЋ!`)
-                                .addFields(
-                                    { name: 'рџ“є РљР°РЅР°Р»', value: `https://twitch.tv/${channel.login}`, inline: true },
-                                    { name: 'рџЋ® РРіСЂР°', value: 'League of Legends', inline: true }
-                                )
-                                .setThumbnail(`https://static-cdn.jtvnw.net/jtv_user_pictures/${channel.login}-profile_image-70x70.png`)
-                                .setTimestamp()
-                        ]}).catch(() => {});
-                    }
-                }
-            }
-            
-            // Р•СЃР»Рё СЃС‚СЂРёРј Р·Р°РєРѕРЅС‡РёР»СЃСЏ
-            if (!isLive && wasLive) {
-                console.log(`вљ« ${channel.name} Р·Р°РєРѕРЅС‡РёР» СЃС‚СЂРёРј`);
-            }
-            
-            streamStatus.set(channel.login, isLive);
-            
-        } catch (err) {
-            console.log('вљ пёЏ Twitch РѕС€РёР±РєР°:', err.message.substring(0, 50));
-        }
-    }
-}
-
 // РҐСЂР°РЅРёР»РёС‰Рµ РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… РЅРѕРІРѕСЃС‚РµР№ (С‡С‚РѕР±С‹ РЅРµ РґСѓР±Р»РёСЂРѕРІР°С‚СЊ)
 const publishedNews = new Set();
 const publishedLoLNews = new Set();
@@ -1982,8 +1920,6 @@ client.on('ready', () => {
         console.log(`вЏ° РџСЂРѕРІРµСЂСЏСЋ РІСЂРµРјСЏ: ${currentHour}:00`);
 
         // рџ”ґ РџСЂРѕРІРµСЂСЏРµРј Twitch СЃС‚СЂРёРјС‹ РєР°Р¶РґС‹Рµ 5 РјРёРЅСѓС‚
-        await checkTwitchStreams(client);
-
         // рџ“° РРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё
         if (newsHours.includes(currentHour)) {
             console.log('рџ“° РћР±РЅРѕРІР»СЏСЋ РёРіСЂРѕРІС‹Рµ РЅРѕРІРѕСЃС‚Рё...');
