@@ -1,7 +1,4 @@
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
-const { Player } = require('discord-player');
-const { extractors, DefaultExtractors } = require('@discord-player/extractor');
 const RSSParser = require('rss-parser');
 const TelegramBot = require('node-telegram-bot-api');
 const dotenv = require('dotenv');
@@ -41,13 +38,6 @@ if (process.env.PROXY) {
 }
 
 const client = new Client(clientOptions);
-
-const player = new Player(client);
-
-// Регистрация экстракторов для YouTube и других источников
-player.extractors.loadMulti(DefaultExtractors).then(() => {
-    console.log('🎵 Экстракторы музыки загружены!');
-});
 
 // ==================== TELEGRAM BOT ====================
 
@@ -685,52 +675,6 @@ async function translateToRussian(text) {
     return text;
 }
 
-// Логирование событий плеера
-player.events.on('playerStart', (queue, track) => {
-    console.log(`🎵 Воспроизведение: ${track.title}`);
-    console.log(`🔗 Голосовой канал: ${queue.channel?.name || 'неизвестно'}`);
-});
-
-player.events.on('playerFinish', (queue, track) => {
-    console.log(`✅ Трек завершён: ${track.title}`);
-});
-
-player.events.on('playerSkip', (queue, track) => {
-    console.log(`⏭️ Трек пропущен: ${track.title}`);
-});
-
-player.events.on('playerError', (queue, error, track) => {
-    console.error(`❌ Ошибка плеера: ${error.message}`);
-    console.error(`❌ Трек: ${track?.title || 'неизвестно'}`);
-    console.error(error.stack);
-});
-
-player.events.on('error', (queue, error) => {
-    console.error(`❌ Ошибка очереди: ${error.message}`);
-    console.error(error.stack);
-});
-
-player.events.on('connectionError', (queue, error) => {
-    console.error(`❌ Ошибка подключения: ${error.message}`);
-    console.error(error.stack);
-});
-
-player.events.on('disconnect', (queue) => {
-    console.log(`🔌 Отключено от голосового канала`);
-});
-
-player.events.on('emptyChannel', (queue) => {
-    console.log(`📭 Канал пуст, отключаемся`);
-});
-
-player.events.on('emptyQueue', (queue) => {
-    console.log(`📭 Очередь пуста`);
-});
-
-player.events.on('connectionError', (queue, error) => {
-    console.error(`❌ Ошибка подключения: ${error.message}`);
-});
-
 // ==================== КОМАНДЫ ====================
 
 const commands = new Map();
@@ -1022,95 +966,6 @@ commands.set('roulette', {
                 { name: 'Выпало', value: `${emoji} ${result} ${resultColor}`, inline: true },
                 { name: 'Результат', value: win ? '🏆 ДЖЕКПОТ!' : colorWin ? '✅ Цвет угадал!' : '💀 Проиграл!' }
             )
-            .setTimestamp();
-        message.channel.send({ embeds: [embed] });
-    }
-});
-
-// --- МУЗЫКА ---
-
-commands.set('play', {
-    name: 'play',
-    description: 'Включить музыку с YouTube',
-    usage: '!play [название/ссылка]',
-    async execute(message, args) {
-        const voiceChannel = message.member.voice.channel;
-        if (!voiceChannel) {
-            return message.reply('❌ Зайди в голосовой канал!');
-        }
-
-        const query = args.join(' ');
-        if (!query) return message.reply('❌ Укажи название или ссылку: !play Never Gonna Give You Up');
-
-        try {
-            const track = await player.play(voiceChannel, query, {
-                nodeOptions: {
-                    metadata: { channel: message.channel },
-                    leaveOnEmpty: false,
-                    leaveOnEnd: false,
-                    leaveOnEmptyTimeout: 300000,
-                    selfDeaf: true,
-                    volume: 50,
-                },
-                requestedBy: message.author,
-            });
-
-            const embed = new EmbedBuilder()
-                .setColor(0x00ff00)
-                .setTitle('🎵 Добавлено в очередь')
-                .addFields(
-                    { name: 'Трек', value: track.track.title, inline: true },
-                    { name: 'Длительность', value: track.track.duration, inline: true },
-                    { name: 'Автор', value: track.track.author, inline: true }
-                )
-                .setThumbnail(track.track.thumbnail)
-                .setTimestamp();
-            message.channel.send({ embeds: [embed] });
-        } catch (err) {
-            console.error('❌ Ошибка музыки:', err.message);
-            console.error(err.stack);
-            message.reply(`❌ Ошибка: ${err.message.substring(0, 200)}`);
-        }
-    }
-});
-
-commands.set('skip', {
-    name: 'skip',
-    description: 'Пропустить текущий трек',
-    async execute(message) {
-        const queue = player.nodes.get(message.guild);
-        if (!queue || !queue.isPlaying()) return message.reply('❌ Ничего не играет!');
-
-        queue.node.skip();
-        message.reply('⏭️ Трек пропущен!');
-    }
-});
-
-commands.set('stop', {
-    name: 'stop',
-    description: 'Остановить музыку',
-    async execute(message) {
-        const queue = player.nodes.get(message.guild);
-        if (!queue) return message.reply('❌ Ничего не играет!');
-
-        queue.destroy();
-        message.reply('⏹️ Музыка остановлена!');
-    }
-});
-
-commands.set('queue', {
-    name: 'queue',
-    description: 'Показать очередь',
-    async execute(message) {
-        const queue = player.nodes.get(message.guild);
-        if (!queue || !queue.tracks.size) return message.reply('❌ Очередь пуста!');
-
-        const tracks = queue.tracks.map((track, i) => `${i + 1}. ${track.title} - ${track.author}`);
-
-        const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle('🎶 Очередь воспроизведения')
-            .setDescription(tracks.join('\n').substring(0, 2000))
             .setTimestamp();
         message.channel.send({ embeds: [embed] });
     }
@@ -1752,7 +1607,7 @@ commands.set('commands', {
                 { name: 'Анти-спам', value: '30+ сообщений за 10 сек = мут', inline: true },
                 { name: 'Анти-ссылки', value: 'Ссылки запрещены (кроме игр, музыки, бот-команд)', inline: true }
             )
-            .setFooter({ text: 'Бот: Зохан младший • Музыка: Jockie Music' })
+            .setFooter({ text: 'Бот: Зохан младший • Музыка: Jockie Music (m!play)' })
             .setTimestamp();
         await channel.send({ embeds: [embed1] });
 
@@ -1909,7 +1764,7 @@ commands.set('help', {
             .addFields(
                 { name: '🛡️ Модерация', value: '`!kick` `!ban` `!unban` `!mute` `!unmute` `!clear`' },
                 { name: '🎮 Мини-игры', value: '`!random` `!rps` `!roulette`' },
-                { name: '🎵 Музыка', value: '`!play` `!skip` `!stop` `!queue`' },
+                { name: '🎵 Музыка', value: 'Используй `m!play` (Jockie Music бот)' },
                 { name: '🎉 Розыгрыши', value: '`!giveaway`' },
                 { name: '📊 Опросы', value: '`!poll`' },
                 { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
@@ -2057,7 +1912,7 @@ commands.set('poll', {
 
 client.on('ready', () => {
     console.log(`✅ Бот ${client.user.tag} запущен!`);
-    client.user.setActivity('!help | Играю в игры', { type: ActivityType.Playing });
+    client.user.setActivity('!help | Сервер ZOHAN', { type: ActivityType.Playing });
 
     // Запуск Telegram бота (если настроен)
     if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
