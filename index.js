@@ -1733,7 +1733,7 @@ commands.set('help', {
             .setDescription('Р’СЃРµ РґРѕСЃС‚СѓРїРЅС‹Рµ РєРѕРјР°РЅРґС‹:')
             .addFields(
                 { name: 'рџ›ЎпёЏ РњРѕРґРµСЂР°С†РёСЏ', value: '`!kick` `!ban` `!unban` `!mute` `!unmute` `!clear`' },
-                { name: 'рџЋ® РњРёРЅРё-РёРіСЂС‹', value: '`!random` `!rps` `!roulette`' },
+                { name: 'рџЋ® РњРёРЅРё-РёРіСЂС‹', value: '`!random` `!rps` `!roulette` `!champ` `!champscores`' },
                 { name: 'рџЋµ РњСѓР·С‹РєР°', value: 'РСЃРїРѕР»СЊР·СѓР№ `m!play` (Jockie Music Р±РѕС‚)' },
                 { name: 'рџЋ‰ Р РѕР·С‹РіСЂС‹С€Рё', value: '`!giveaway`' },
                 { name: 'рџ“Љ РћРїСЂРѕСЃС‹', value: '`!poll`' },
@@ -2318,6 +2318,331 @@ server.listen(PORT, () => {
 });
 
 // ==================== Р—РђРџРЈРЎРљ ====================
+
+
+
+// ==================== МИНИ-ИГРА: УГАДАЙ ЧЕМПИОНА ====================
+
+// Все чемпионы Data Dragon для мини-игры
+const ALL_CHAMPIONS = [
+    'Ahri','Akali','Alistar','Amumu','Anivia','Annie','Ashe','Aurelion Sol','Azir',
+    'Bard','Blitzcrank','Brand','Braum','Caitlyn','Camille','Cassiopeia','Cho Gath',
+    'Corki','Darius','Diana','Dr Mundo','Draven','Ekko','Elise','Evelynn','Ezreal',
+    'Fiddlesticks','Fiora','Fizz','Galio','Gangplank','Garen','Gragas','Graves',
+    'Hecarim','Heimerdinger','Illaoi','Irelia','Ivern','Janna','Jarvan IV','Jax',
+    'Jayce','Jhin','Jinx','Kai Sa','Kalista','Karma','Karthus','Kassadin','Katarina',
+    'Kayle','Kayn','Kennen','Kha Zix','Kindred','Kled','Kog Maw','LeBlanc','Lee Sin',
+    'Leona','Lillia','Lissandra','Lucian','Lulu','Lux','Malphite','Malzahar','Maokai',
+    'Master Yi','Miss Fortune','Mordekaiser','Morgana','Nami','Nasus','Nautilus','Neeko',
+    'Nidalee','Nocturne','Nunu and Willump','Olaf','Orianna','Ornn','Pantheon','Poppy',
+    'Pyke','Qiyana','Quinn','Rakan','Rammus','Rek Sai','Renekton','Rengar','Riven',
+    'Rumble','Ryze','Samira','Sejuani','Senna','Seraphine','Sett','Shaco','Shen',
+    'Shyvana','Singed','Sion','Sivir','Skarner','Sona','Soraka','Swain','Sylas',
+    'Syndra','Tahm Kench','Taliyah','Talon','Taric','Teemo','Thresh','Tristana',
+    'Trundle','Tryndamere','Twisted Fate','Twitch','Urgot','Varus','Vayne','Veigar',
+    'Vel Koz','Vi','Viktor','Vladimir','Volibear','Warwick','Wukong','Xayah','Xerath',
+    'Xin Zhao','Yasuo','Yorick','Yuumi','Zac','Zed','Ziggs','Zilean','Zoe','Zyra'
+];
+
+// Активные игры (channelId -> game state)
+const activeGames = new Map();
+
+// Очки игроков (userId -> { wins, total })
+const champScores = new Map();
+
+// Загрузка/сохранение очков
+const SCORES_FILE = __dirname + '/champ-scores.json';
+function loadScores() {
+    try {
+        if (fs.existsSync(SCORES_FILE)) {
+            const data = JSON.parse(fs.readFileSync(SCORES_FILE, 'utf8'));
+            for (const [k, v] of Object.entries(data)) champScores.set(k, v);
+        }
+    } catch (e) {}
+}
+function saveScores() {
+    try {
+        const data = Object.fromEntries(champScores);
+        fs.writeFileSync(SCORES_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {}
+}
+loadScores();
+
+commands.set('champ', {
+    name: 'champ',
+    description: 'Мини-игра: Угадай чемпиона по картинке!',
+    usage: '!champ',
+    async execute(message) {
+        if (activeGames.has(message.channel.id)) {
+            return message.reply('⚠️ Уже идёт игра! Дождитесь окончания.');
+        }
+
+        // Выбираем случайного чемпиона
+        const champion = ALL_CHAMPIONS[Math.floor(Math.random() * ALL_CHAMPIONS.length)];
+        const champId = champion.replace(/[^a-zA-Z]/g, '');
+        const imageUrl = `https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/${champId}.png`;
+
+        // Начинаем игру
+        activeGames.set(message.channel.id, {
+            champion: champion.toLowerCase(),
+            championName: champion,
+            startedBy: message.author.id,
+            startTime: Date.now(),
+            hinted: false
+        });
+
+        const embed = new EmbedBuilder()
+            .setColor(0xff6600)
+            .setTitle('🎮 Угадай чемпиона!')
+            .setDescription('Кто этот чемпион? Напиши имя в чат!\n\n⏱️ У вас **30 секунд**.')
+            .setImage(imageUrl)
+            .setFooter({ text: 'Напиши имя чемпиона в чат' })
+            .setTimestamp();
+
+        await message.channel.send({ embeds: [embed] });
+
+        // Таймер 30 секунд
+        setTimeout(() => {
+            if (activeGames.has(message.channel.id)) {
+                const game = activeGames.get(message.channel.id);
+                activeGames.delete(message.channel.id);
+                const timeUp = new EmbedBuilder()
+                    .setColor(0xff0000)
+                    .setTitle('⏰ Время вышло!')
+                    .setDescription(`Правильный ответ: **${game.championName}**`)
+                    .setThumbnail(`https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/${game.championName.replace(/[^a-zA-Z]/g, '')}.png`);
+                message.channel.send({ embeds: [timeUp] });
+            }
+        }, 30000);
+    }
+});
+
+commands.set('champscores', {
+    name: 'champscores',
+    description: 'Таблица лидеров мини-игры "Угадай чемпиона"',
+    usage: '!champscores',
+    execute(message) {
+        const scores = Array.from(champScores.entries())
+            .sort((a, b) => b[1].wins - a[1].wins)
+            .slice(0, 10);
+
+        if (scores.length === 0) {
+            return message.reply('Пока нет результатов. Сыграйте: !champ');
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle('🏆 Таблица лидеров — Угадай чемпиона')
+            .setDescription(scores.map((s, i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+                return `${medal} <@${s[0]}> — **${s[1].wins}** побед из ${s[1].total} игр`;
+            }).join('\n'))
+            .setTimestamp();
+        message.channel.send({ embeds: [embed] });
+    }
+});
+
+// Обработка ответов в мини-игре
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+    if (!message.content.startsWith(process.env.PREFIX || '!')) return;
+
+    const game = activeGames.get(message.channel.id);
+    if (!game) return;
+
+    const guess = message.content.slice((process.env.PREFIX || '!').length).trim().toLowerCase();
+    const cmd = guess.split(' ')[0];
+
+    // Игнорируем команды бота
+    if (commands.has(cmd)) return;
+
+    if (guess === game.champion) {
+        // Правильно!
+        activeGames.delete(message.channel.id);
+
+        const userId = message.author.id;
+        if (!champScores.has(userId)) champScores.set(userId, { wins: 0, total: 0 });
+        const score = champScores.get(userId);
+        score.wins++;
+        score.total++;
+        saveScores();
+
+        const embed = new EmbedBuilder()
+            .setColor(0x00ff00)
+            .setTitle('🎉 Правильно!')
+            .setDescription(`**${message.author.username}** угадал(а) — **${game.championName}**!`)
+            .addFields(
+                { name: '⏱️ Время', value: `${Math.round((Date.now() - game.startTime) / 1000)} сек.`, inline: true },
+                { name: '🏆 Побед', value: `${score.wins}`, inline: true }
+            )
+            .setThumbnail(`https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/${game.championName.replace(/[^a-zA-Z]/g, '')}.png`)
+            .setTimestamp();
+        await message.channel.send({ embeds: [embed] });
+    } else if (guess.length > 2 && !game.hinted && guess.length >= game.champion.length - 2) {
+        // Подсказка: первая и последняя буква
+        game.hinted = true;
+        const hint = game.championName[0] + '*'.repeat(game.championName.length - 2) + game.championName[game.championName.length - 1];
+        await message.reply(`💡 Подсказка: **${hint}** (${game.championName.length} букв)`);
+    }
+});
+
+
+// ==================== СИСТЕМА УРОВНЕЙ / XP ====================
+
+const XP_FILE = __dirname + '/xp-data.json';
+const xpData = new Map();
+
+// Загрузка XP данных
+function loadXP() {
+    try {
+        if (fs.existsSync(XP_FILE)) {
+            const data = JSON.parse(fs.readFileSync(XP_FILE, 'utf8'));
+            for (const [k, v] of Object.entries(data)) xpData.set(k, v);
+        }
+    } catch (e) {}
+}
+function saveXP() {
+    try {
+        const data = Object.fromEntries(xpData);
+        fs.writeFileSync(XP_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {}
+}
+loadXP();
+
+// XP за сообщение (5-15 рандомно)
+const XP_PER_MESSAGE = { min: 5, max: 15 };
+
+// Пороги уровней: level N требует N*100 XP
+function getXPForLevel(level) {
+    return level * 100;
+}
+
+function getLevelInfo(xp) {
+    let level = 1;
+    let remainingXP = xp;
+    while (remainingXP >= getXPForLevel(level)) {
+        remainingXP -= getXPForLevel(level);
+        level++;
+    }
+    return { level, currentXP: remainingXP, nextLevelXP: getXPForLevel(level) };
+}
+
+function getRankEmoji(level) {
+    if (level >= 50) return '👑';
+    if (level >= 30) return '💎';
+    if (level >= 20) return '🥇';
+    if (level >= 10) return '🥈';
+    if (level >= 5) return '🥉';
+    return '⭐';
+}
+
+// Начисление XP за сообщение
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+
+    const userId = message.author.id;
+    if (!xpData.has(userId)) xpData.set(userId, { xp: 0, messages: 0, lastLevel: 1 });
+
+    const userData = xpData.get(userId);
+    const oldLevel = getLevelInfo(userData.xp).level;
+
+    // Рандомный XP
+    const xpGain = Math.floor(Math.random() * (XP_PER_MESSAGE.max - XP_PER_MESSAGE.min + 1)) + XP_PER_MESSAGE.min;
+    userData.xp += xpGain;
+    userData.messages++;
+
+    const newInfo = getLevelInfo(userData.xp);
+
+    // Уведомление о новом уровне
+    if (newInfo.level > oldLevel) {
+        userData.lastLevel = newInfo.level;
+        const embed = new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle(`🎉 Новый уровень! ${getRankEmoji(newInfo.level)}`)
+            .setDescription(`**${message.author.username}** достиг уровня **${newInfo.level}**!`)
+            .addFields(
+                { name: '📊 Всего XP', value: `${userData.xp}`, inline: true },
+                { name: '💬 Сообщений', value: `${userData.messages}`, inline: true }
+            )
+            .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+            .setTimestamp();
+        await message.channel.send({ embeds: [embed] });
+    }
+
+    saveXP();
+});
+
+// Команда !level
+commands.set('level', {
+    name: 'level',
+    description: 'Показать твой уровень и XP',
+    usage: '!level [@user]',
+    execute(message, args) {
+        const user = message.mentions.users.first() || message.author;
+        const userData = xpData.get(user.id) || { xp: 0, messages: 0 };
+        const info = getLevelInfo(userData.xp);
+        const emoji = getRankEmoji(info.level);
+        const progress = Math.round((info.currentXP / info.nextLevelXP) * 100);
+
+        // Прогресс-бар
+        const filled = Math.round(progress / 10);
+        const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
+
+        const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle(`${emoji} Уровень ${info.level}`)
+            .setDescription(`**${user.username}**`)
+            .addFields(
+                { name: '📊 XP', value: `${info.currentXP} / ${info.nextLevelXP}` , inline: true },
+                { name: '💬 Сообщений', value: `${userData.messages}`, inline: true },
+                { name: 'Прогресс', value: bar + ' (' + progress + '%)' }
+            )
+            .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+            .setTimestamp();
+        message.channel.send({ embeds: [embed] });
+    }
+});
+
+// Команда !leaderboard
+commands.set('leaderboard', {
+    name: 'leaderboard',
+    description: 'Таблица лидеров по уровням',
+    usage: '!leaderboard',
+    execute(message) {
+        const sorted = Array.from(xpData.entries())
+            .sort((a, b) => b[1].xp - a[1].xp)
+            .slice(0, 10);
+
+        if (sorted.length === 0) {
+            return message.reply('Пока нет данных. Пишите в чат чтобы набирать XP!');
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle('🏆 Таблица лидеров')
+            .setDescription(sorted.map((s, i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+                const info = getLevelInfo(s[1].xp);
+                const emoji = getRankEmoji(info.level);
+                return `${medal} <@${s[0]}> — ${emoji} Ур. **${info.level}** (${s[1].xp} XP)`;
+            }).join('\n'))
+            .setTimestamp();
+        message.channel.send({ embeds: [embed] });
+    }
+});
+
+// Команда !rank (быстрая проверка)
+commands.set('rank', {
+    name: 'rank',
+    description: 'Быстро проверить свой уровень',
+    usage: '!rank',
+    execute(message) {
+        const userData = xpData.get(message.author.id) || { xp: 0, messages: 0 };
+        const info = getLevelInfo(userData.xp);
+        const emoji = getRankEmoji(info.level);
+        message.reply(`${emoji} Уровень **${info.level}** | **${userData.xp}** XP | **${userData.messages}** сообщений`);
+    }
+});
 
 client.login(process.env.TOKEN);
 
