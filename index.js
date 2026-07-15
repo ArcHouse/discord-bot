@@ -218,8 +218,36 @@ async function checkTwitchStreams(client) {
     }
 }
 
-// Хранилище опубликованных новостей (чтобы не дублировать)
+// Хранилище опубликованных новостей (чтобы не дублировать) — сохраняется в файл
+const NEWS_FILE = path.join(__dirname, 'published-news.json');
 const publishedNews = new Set();
+
+// Загрузка опубликованных новостей из файла
+function loadPublishedNews() {
+    try {
+        if (fs.existsSync(NEWS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(NEWS_FILE, 'utf8'));
+            data.forEach(url => publishedNews.add(url));
+            console.log(`📰 Загружено ${publishedNews.size} опубликованных новостей`);
+        }
+    } catch (e) {}
+}
+
+// Сохранение в файл (не чаще раза в 5 минут)
+let lastNewsSave = 0;
+function savePublishedNews() {
+    const now = Date.now();
+    if (now - lastNewsSave < 5 * 60 * 1000) return;
+    lastNewsSave = now;
+    try {
+        // Храним только последние 500 записей чтобы файл не рос бесконечно
+        const arr = Array.from(publishedNews);
+        const trimmed = arr.slice(-500);
+        fs.writeFileSync(NEWS_FILE, JSON.stringify(trimmed), 'utf8');
+    } catch (e) {}
+}
+
+loadPublishedNews();
 const publishedLoLNews = new Set();
 
 // ==================== LOL ДАННЫЕ (OP.GG УРОВЕНЬ) ====================
@@ -611,22 +639,21 @@ async function postNewsToChannel(client) {
             }
 
             let posted = 0;
-            const MAX_POSTS = 5; // Максимум 5 новостей за раз
+            const MAX_POSTS = 5;
 
             for (const item of news) {
                 if (posted >= MAX_POSTS) break;
 
-                // Дедупликация по ссылке (самый надёжный способ)
+                // Дедупликация по ссылке
                 if (item.link && publishedNews.has(item.link)) continue;
-                // Дедупликация по заголовку (fallback)
+                // Дедупликация по заголовку
                 const titleKey = item.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
                 if (publishedNews.has('title:' + titleKey)) continue;
 
-                // Переводим заголовок и описание на русский
+                // Переводим на русский
                 const translatedTitle = await translateToRussian(item.title);
                 const translatedContent = await translateToRussian(item.content);
 
-                // Публикуем новость
                 const embed = new EmbedBuilder()
                     .setColor(getColorBySource(item.source))
                     .setTitle(`${item.emoji} ${translatedTitle}`)
@@ -642,7 +669,8 @@ async function postNewsToChannel(client) {
                     try { embed.setImage(item.image); } catch (err) {}
                 }
 
-                await newsChannel.send({ embeds: [embed] }).catch(err => {
+                // Отправляем БЕЗ уведомлений (flags: 4096 = SUPPRESS_NOTIFICATIONS)
+                await newsChannel.send({ embeds: [embed], flags: 4096 }).catch(err => {
                     console.error('❌ Ошибка отправки:', err.message);
                 });
 
@@ -654,6 +682,7 @@ async function postNewsToChannel(client) {
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
 
+            savePublishedNews();
             console.log(`✅ Опубликовано ${posted} новых новостей`);
         }
     } catch (err) {
@@ -2734,5 +2763,9 @@ commands.set('rank', {
         message.reply(`${emoji} Уровень **${info.level}** | **${userData.xp}** XP | **${userData.messages}** сообщений`);
     }
 });
+
+// Сохраняем опубликованные новости при завершении
+process.on('SIGTERM', () => { savePublishedNews(); process.exit(0); });
+process.on('SIGINT', () => { savePublishedNews(); process.exit(0); });
 
 client.login(process.env.TOKEN);
