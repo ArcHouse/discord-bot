@@ -1,4 +1,4 @@
-﻿const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
 const RSSParser = require('rss-parser');
 const TelegramBot = require('node-telegram-bot-api');
 const dotenv = require('dotenv');
@@ -115,27 +115,27 @@ const RSS_FEEDS = [
     {
         name: 'PC Gamer',
         url: 'https://www.pcgamer.com/rss/',
-        emoji: 'рџ–ҐпёЏ'
+        emoji: "🖥️"
     },
     {
         name: 'Eurogamer',
         url: 'https://www.eurogamer.net/feed',
-        emoji: 'рџЋ®'
+        emoji: "🎮"
     },
     {
         name: 'Rock Paper Shotgun',
         url: 'https://www.rockpapershotgun.com/feed',
-        emoji: 'рџ“°'
+        emoji: "📰"
     },
     {
         name: 'VG247',
         url: 'https://www.vg247.com/feed',
-        emoji: 'рџЋЇ'
+        emoji: "🎵"
     },
     {
         name: 'GamesIndustry',
         url: 'https://www.gamesindustry.biz/feed',
-        emoji: 'рџ“Љ'
+        emoji: "📱"
     }
 ];
 
@@ -144,19 +144,19 @@ const LOL_RSS_FEEDS = [
     {
         name: 'Surrender at 20',
         url: 'https://www.surrenderat20.net/feeds/posts/default?alt=rss',
-        emoji: 'рџ“°',
+        emoji: "📰",
         lolOnly: true
     },
     {
         name: 'LoL Esports',
         url: 'https://lolesports.com/rss',
-        emoji: 'рџЏ†',
+        emoji: "🏆",
         lolOnly: true
     },
     {
         name: 'LeagueFeed',
         url: 'https://www.leaguefeed.net/feed',
-        emoji: 'рџЋ®',
+        emoji: "🎮",
         lolOnly: true
     }
 ];
@@ -453,22 +453,39 @@ async function fetchGameNews() {
         try {
             const data = await rssParser.parseURL(feed.url);
             const items = data.items.slice(0, 5).map(item => {
-                // РР·РІР»РµРєР°РµРј РєР°СЂС‚РёРЅРєСѓ РёР· РЅРѕРІРѕСЃС‚Рё
+                // Извлекаем картинку из новости
                 let image = null;
-
-                // РџСЂРѕРІРµСЂСЏРµРј СЂР°Р·РЅС‹Рµ РёСЃС‚РѕС‡РЅРёРєРё РєР°СЂС‚РёРЅРѕРє РІ RSS
-                if (item.enclosure?.url) {
+                
+                // 1. Прямые ссылки из RSS
+                if (item.enclosure?.url && item.enclosure.type?.startsWith('image')) {
                     image = item.enclosure.url;
                 } else if (item['media:thumbnail']?.$?.url) {
                     image = item['media:thumbnail'].$.url;
                 } else if (item['media:content']?.$?.url) {
                     image = item['media:content'].$.url;
-                } else if (item.content) {
-                    // РџСЂРѕР±СѓРµРј РёР·РІР»РµС‡СЊ РєР°СЂС‚РёРЅРєСѓ РёР· HTML РєРѕРЅС‚РµРЅС‚Р°
-                    const imgMatch = item.content.match(/<img[^>]+src="([^"]+)"/);
-                    if (imgMatch) {
-                        image = imgMatch[1];
-                    }
+                }
+                
+                // 2. Ищем картинки в HTML контенте
+                if (!image && item.content) {
+                    const imgMatches = item.content.match(/<img[^>]+src="([^"]+)"/);
+                    if (imgMatches) image = imgMatches[1];
+                }
+                
+                // 3. Пробуем content:encoded
+                if (!image && item['content:encoded']) {
+                    const imgMatches = item['content:encoded'].match(/<img[^>]+src="([^"]+)"/);
+                    if (imgMatches) image = imgMatches[1];
+                }
+                
+                // 4. Ищем в description
+                if (!image && item.description) {
+                    const imgMatches = item.description.match(/<img[^>]+src="([^"]+)"/);
+                    if (imgMatches) image = imgMatches[1];
+                }
+                
+                // 5. Фильтруем не-картинки
+                if (image && (image.endsWith('.svg') || image.includes('icon') || image.includes('logo'))) {
+                    image = null;
                 }
 
                 return {
@@ -652,29 +669,46 @@ function formatDate(dateStr) {
     }
 }
 
-// РџРµСЂРµРІРѕРґ С‚РµРєСЃС‚Р° РЅР° СЂСѓСЃСЃРєРёР№ (С‡РµСЂРµР· Р±РµСЃРїР»Р°С‚РЅС‹Р№ API)
+function sanitizeText(text) {
+    if (!text) return '';
+    let c = text.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&nbsp;/g, ' ').replace(/&[^;]+;/g, ' ');
+    c = c.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    return c.replace(/\s{2,}/g, ' ').trim().substring(0, 1000);
+}
+
+// Перевод текста на русский (через бесплатный API)
 async function translateToRussian(text) {
     if (!text || text.length < 10) return text;
 
-    try {
-        // РСЃРїРѕР»СЊР·СѓРµРј MyMemory API (Р±РµСЃРїР»Р°С‚РЅС‹Р№, Р±РµР· РєР»СЋС‡Р°)
-        const encodedText = encodeURIComponent(text.substring(0, 500));
-        const response = await fetch(
-            `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=en|ru`,
-            { signal: AbortSignal.timeout(5000) }
-        );
+    const cleaned = sanitizeText(text);
+    if (cleaned.length < 10) return cleaned;
 
-        if (response.ok) {
-            const data = await response.json();
-            if (data.responseStatus === 200 && data.responseData?.translatedText) {
-                return data.responseData.translatedText;
+    try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const encodedText = encodeURIComponent(cleaned.substring(0, 500));
+                const response = await fetch(
+                    `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=en|ru&de=bot@discord.com`,
+                    { signal: AbortSignal.timeout(8000) }
+                );
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.responseStatus === 200 && data.responseData?.translatedText) {
+                        const translated = data.responseData.translatedText;
+                        if (translated !== cleanText && !translated.includes('MYMEMORY WARNING')) {
+                            return translated;
+                        }
+                    }
+                }
+                await new Promise(r => setTimeout(r, 1000));
+            } catch (e) {
+                await new Promise(r => setTimeout(r, 1000));
             }
         }
     } catch (err) {
-        console.error('вљ пёЏ РћС€РёР±РєР° РїРµСЂРµРІРѕРґР°:', err.message);
+        console.error('⚠️ Ошибка перевода:', err.message);
     }
 
-    // Fallback: РІРѕР·РІСЂР°С‰Р°РµРј РѕСЂРёРіРёРЅР°Р»СЊРЅС‹Р№ С‚РµРєСЃС‚
     return text;
 }
 
