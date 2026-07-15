@@ -110,47 +110,46 @@ const RSS_FEEDS = [
     }
 ];
 
-// LOL RSS-ленты (используем рабочие игровые источники с LOL контентом)
+// LOL RSS-ленты (только LOL-специфичные источники)
 const LOL_RSS_FEEDS = [
     {
-        name: 'PC Gamer',
-        url: 'https://www.pcgamer.com/rss/',
-        emoji: '🎮'
+        name: 'Surrender at 20',
+        url: 'https://www.surrenderat20.net/feeds/posts/default?alt=rss',
+        emoji: '📰',
+        lolOnly: true
     },
     {
-        name: 'Eurogamer',
-        url: 'https://www.eurogamer.net/feed',
-        emoji: '📰'
+        name: 'LoL Esports',
+        url: 'https://lolesports.com/rss',
+        emoji: '🏆',
+        lolOnly: true
     },
     {
-        name: 'Rock Paper Shotgun',
-        url: 'https://www.rockpapershotgun.com/feed',
-        emoji: '🎯'
+        name: 'LeagueFeed',
+        url: 'https://www.leaguefeed.net/feed',
+        emoji: '🎮',
+        lolOnly: true
     }
 ];
 
-// LOL YouTube каналы (пока не работает - YouTube блокирует)
-const LOL_YOUTUBE_CHANNELS = [];
+// Ключевые слова LOL для фильтрации контента
+const LOL_KEYWORDS = [
+    'league of legends', 'lol', 'riot', 'summoner', 'rift', 'champion', 'patch',
+    'ARAM', 'summoners rift', 'ranked', 'diamond', 'emerald', 'platinum', 'gold',
+    'silver', 'bronze', 'master', 'grandmaster', 'challenger', 'pro player',
+    'worlds', 'msi', 'lcs', 'lec', 'lck', 'lpl', ' worlds championship',
+    'ahri', 'yasuo', 'jinx', 'thresh', 'garen', 'darius', 'vayne', 'caitlyn',
+    'lux', 'fizz', 'katarina', 'zed', 'irelia', 'riven', 'lee sin', 'master yi',
+    'teemo', 'annie', 'ashe', 'soraka', 'blitzcrank', 'morgana', 'leona',
+    'skin', 'battle pass', 'arcane', 'tft', 'teamfight tactics',
+    'patch notes', 'balance', 'nerf', 'buff', 'rework', 'new champion',
+    'lcs', 'lec', 'lck', 'lpl', 'worlds', 'all star', 'mid season'
+];
 
-// Функция получения LOL YouTube видео
-async function fetchLoLYouTube() {
-    const allVideos = [];
-    for (const channel of LOL_YOUTUBE_CHANNELS) {
-        try {
-            const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.id}`;
-            const data = await rssParser.parseURL(url);
-            const videos = data.items.slice(0, 3).map(item => ({
-                title: item.title,
-                link: item.link,
-                date: item.pubDate,
-                channel: channel.name
-            }));
-            allVideos.push(...videos);
-        } catch (err) {
-            console.log('⚠️ YouTube ошибка:', channel.name, err.message.substring(0, 50));
-        }
-    }
-    return allVideos.slice(0, 5);
+// Проверка является ли текст о League of Legends
+function isLoLContent(title, content) {
+    const text = (title + ' ' + content).toLowerCase();
+    return LOL_KEYWORDS.some(keyword => text.includes(keyword.toLowerCase()));
 }
 
 // ==================== TWITCH УВЕДОМЛЕНИЯ ====================
@@ -532,20 +531,56 @@ async function fetchLoLNews() {
     for (const feed of LOL_RSS_FEEDS) {
         try {
             const data = await rssParser.parseURL(feed.url);
-            const items = data.items.slice(0, 3).map(item => ({
-                title: item.title,
-                link: item.link,
-                date: item.pubDate || item.isoDate,
-                source: feed.name,
-                emoji: feed.emoji,
-                content: item.contentSnippet || item.content || ''
-            }));
+            const items = data.items.slice(0, 10).map(item => {
+                // Извлекаем картинку из новости
+                let image = null;
+                if (item.enclosure?.url) {
+                    image = item.enclosure.url;
+                } else if (item['media:thumbnail']?.$?.url) {
+                    image = item['media:thumbnail'].$.url;
+                } else if (item['media:content']?.$?.url) {
+                    image = item['media:content'].$.url;
+                } else if (item.content) {
+                    const imgMatch = item.content.match(/<img[^>]+src="([^"]+)"/);
+                    if (imgMatch) image = imgMatch[1];
+                }
+                // Fallback: попробуем встроенные картинки из content:encoded
+                if (!image && item['content:encoded']) {
+                    const imgMatch = item['content:encoded'].match(/<img[^>]+src="([^"]+)"/);
+                    if (imgMatch) image = imgMatch[1];
+                }
+
+                return {
+                    title: item.title,
+                    link: item.link,
+                    date: item.pubDate || item.isoDate,
+                    source: feed.name,
+                    emoji: feed.emoji,
+                    content: item.contentSnippet || item.content || '',
+                    image: image
+                };
+            });
             allNews.push(...items);
         } catch (err) {
             console.log('⚠️ LOL RSS ошибка:', feed.name, err.message);
         }
     }
-    return allNews.slice(0, 10);
+
+    // Фильтруем только LOL-контент
+    const lolNews = allNews.filter(item => isLoLContent(item.title, item.content));
+    console.log(`🎮 LOL новостей после фильтрации: ${lolNews.length} из ${allNews.length}`);
+
+    // Сортируем по дате (новые сверху)
+    lolNews.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Берём топ 10 и переводим на русский
+    const topNews = lolNews.slice(0, 10);
+    for (const item of topNews) {
+        item.title = await translateToRussian(item.title);
+        item.content = await translateToRussian(item.content);
+    }
+
+    return topNews;
 }
 
 // Функция публикации новости в канал
@@ -1449,7 +1484,7 @@ commands.set('lolhelp', {
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**🛡 КОНТРЫ**', inline: false },
                 { name: '`!counter [чемпион]`', value: 'Лучшие контры против чемпиона\nПример: `!counter Locke`', inline: false },
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**📰 НОВОСТИ**', inline: false },
-                { name: '`!lolnews`', value: 'Последние новости League of Legends\nПример: `!lolnews`', inline: false },
+                { name: '`!lolnews`', value: 'Новости LOL на русском языке с картинками\nИсточники: Surrender at 20, LoL Esports, LeagueFeed\nПример: `!lolnews`', inline: false },
                 { name: '━━━━━━━━━━━━━━━━━━━', value: '**⏰ АВТО-ОБНОВЛЕНИЕ**', inline: false },
                 { name: 'Tier List', value: 'Каждые 6 часов (09:00, 15:00, 21:00)', inline: true },
                 { name: 'Сборки', value: 'Каждые 8 часов (10:00, 18:00)', inline: true },
@@ -1458,37 +1493,6 @@ commands.set('lolhelp', {
             .setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png')
             .setFooter({ text: 'Данные: OP.GG | Все данные на русском языке' })
             .setTimestamp();
-        message.channel.send({ embeds: [embed] });
-    }
-});
-
-// --- LOL ВИДЕО С YOUTUBE ---
-
-commands.set('lolvideos', {
-    name: 'lolvideos',
-    description: 'Свежие LOL видео с YouTube',
-    usage: '!lolvideos',
-    async execute(message) {
-        const videos = await fetchLoLYouTube();
-        if (videos.length === 0) {
-            return message.reply('⚠️ YouTube временно недоступен. Попробуйте позже.');
-        }
-
-        const embed = new EmbedBuilder()
-            .setColor(0xff0000)
-            .setTitle('📺 СВЕЖИЕ LOL ВИДЕО')
-            .setDescription('Последние гайды и обзоры')
-            .setFooter({ text: 'YouTube' })
-            .setTimestamp();
-
-        for (const video of videos) {
-            embed.addFields({
-                name: video.title,
-                value: `[Смотреть](${video.link})`,
-                inline: false
-            });
-        }
-
         message.channel.send({ embeds: [embed] });
     }
 });
@@ -1770,7 +1774,7 @@ commands.set('help', {
                 { name: '🎭 Роли', value: '`!reactrole` `!verify`' },
                 { name: '⚙️ Сервер', value: '`!setup` `!rules` `!welcome` `!autorole` `!verify` `!commands` `!modcommands` `!help`' },
                 { name: '🎮 Новости', value: '`!gamenews` `!news`' },
-                { name: '⚔️ League of Legends', value: '`!tierlist` `!top` `!builds` `!rating` `!counter` `!lolnews` `!lolvideos` `!lolhelp`' },
+                { name: '⚔️ League of Legends', value: '`!tierlist` `!top` `!builds` `!rating` `!counter` `!lolnews` `!lolhelp`' },
                 { name: '🤖 Авто', value: 'Анти-спам, Анти-ссылки, Логирование, Приветствие/Прощание' }
             )
             .setTimestamp();
@@ -1968,11 +1972,7 @@ client.on('ready', () => {
     const ratingHours = [0, 12];
     console.log(`🏆 LOL Рейтинг: ${ratingHours.join(':00, ')}:00`);
 
-    // 📺 LOL YOUTUBE - каждые 6 часов (11:00, 17:00, 23:00)
-    const youtubeHours = [11, 17, 23];
-    console.log(`📺 LOL YouTube: ${youtubeHours.join(':00, ')}:00`);
-
-            // Проверяем каждые 5 минут
+    // Проверяем каждые 30 минут
     setInterval(async () => {
         const currentHour = new Date().getHours();
         console.log(`⏰ Проверяю время: ${currentHour}:00`);
@@ -2001,11 +2001,17 @@ client.on('ready', () => {
                         const embed = new EmbedBuilder()
                             .setColor(0xffd700)
                             .setTitle(`${item.emoji} ${item.title}`)
-                            .setDescription(item.content.substring(0, 300) + '...')
+                            .setDescription(item.content.substring(0, 400) + (item.content.length > 400 ? '...' : ''))
+                            .addFields(
+                                { name: '📰 Источник', value: item.source, inline: true }
+                            )
                             .setURL(item.link)
                             .setTimestamp();
+                        if (item.image) {
+                            try { embed.setImage(item.image); } catch (e) {}
+                        }
                         await lolNewsChannel.send({ embeds: [embed] }).catch(() => {});
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                     }
                 }
             }
@@ -2055,38 +2061,6 @@ client.on('ready', () => {
             }
         }
 
-        // 📺 LOL YouTube видео (в канал lol-гайды)
-        if (youtubeHours.includes(currentHour)) {
-            console.log('📺 Обновляю LOL YouTube видео...');
-            for (const [, guild] of client.guilds.cache) {
-                const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
-                );
-                if (lolGuidesChannel) {
-                    console.log('📺 Канал найден:', lolGuidesChannel.name);
-                    const videos = await fetchLoLYouTube();
-                    console.log('📺 Получено видео:', videos.length);
-                    if (videos.length > 0) {
-                        const embed = new EmbedBuilder()
-                            .setColor(0xff0000)
-                            .setTitle('📺 СВЕЖИЕ LOL ВИДЕО')
-                            .setDescription('Лучшие гайды и обзоры с YouTube')
-                            .setFooter({ text: 'Авто-обновление' })
-                            .setTimestamp();
-                        for (const video of videos) {
-                            embed.addFields({
-                                name: video.title,
-                                value: `[Смотреть](${video.link})`,
-                                inline: false
-                            });
-                        }
-                        await lolGuidesChannel.send({ embeds: [embed] }).catch(() => {});
-                    }
-                } else {
-                    console.log('📺 Канал lol-гайды не найден!');
-                }
-            }
-        }
     }, 30 * 60 * 1000); // Проверяем каждые 30 минут
 });
 
