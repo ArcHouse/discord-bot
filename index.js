@@ -4,6 +4,33 @@ const TelegramBot = require('node-telegram-bot-api');
 const dotenv = require('dotenv');
 
 dotenv.config();
+// Настройки сервера (сохраняются между перезапусками)
+const CONFIG_FILE = path.join(__dirname, 'server-config.json');
+function loadConfig() {
+    try {
+        if (fs.existsSync(CONFIG_FILE)) {
+            const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+            if (data.WELCOME_CHANNEL) process.env.WELCOME_CHANNEL = data.WELCOME_CHANNEL;
+            if (data.AUTOROLE) process.env.AUTOROLE = data.AUTOROLE;
+            console.log('✅ Конфигурация загружена:', data);
+        }
+    } catch (err) {
+        console.log('⚠️ Ошибка загрузки конфига:', err.message);
+    }
+}
+function saveConfig() {
+    try {
+        const data = {};
+        if (process.env.WELCOME_CHANNEL) data.WELCOME_CHANNEL = process.env.WELCOME_CHANNEL;
+        if (process.env.AUTOROLE) data.AUTOROLE = process.env.AUTOROLE;
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2), 'utf8');
+        console.log('✅ Конфигурация сохранена:', data);
+    } catch (err) {
+        console.log('⚠️ Ошибка сохранения конфига:', err.message);
+    }
+}
+loadConfig();
+
 
 // РђРЅС‚РёСЃРїР°Рј С…СЂР°РЅРёР»РёС‰Рµ
 const spamTracker = new Map();
@@ -964,6 +991,7 @@ commands.set('welcome', {
         if (!channel) return message.reply('вќЊ РЈРєР°Р¶Рё РєР°РЅР°Р»: !welcome #РѕР±С‰РµРµ');
 
         process.env.WELCOME_CHANNEL = channel.name;
+            saveConfig();
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
@@ -989,6 +1017,7 @@ commands.set('autorole', {
         if (!role) return message.reply('вќЊ РЈРєР°Р¶Рё СЂРѕР»СЊ: !autorole @Member');
 
         process.env.AUTOROLE = role.id;
+            saveConfig();
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
