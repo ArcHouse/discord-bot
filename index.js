@@ -2044,8 +2044,17 @@ client.on('ready', () => {
         return hours.includes(now);
     }
 
-    // Авто-постинг новостей ОТКЛЮЧЁН — ручной запуск через HTTP-эндпоинты
-    console.log('📰 Авто-постинг новостей отключён. Используй HTTP-эндпоинты для ручного запуска.');
+    // Авто-постинг игровых новостей каждые 6 часов (08:00, 14:00, 20:00)
+    const AUTO_NEWS_HOURS = [8, 14, 20];
+    console.log(`📰 Авто-постинг новостей: ${AUTO_NEWS_HOURS.join(':00, ')}:00`);
+
+    setInterval(async () => {
+        const currentHour = new Date().getHours();
+        if (AUTO_NEWS_HOURS.includes(currentHour)) {
+            console.log('📰 Авто-обновление игровых новостей...');
+            await postNewsToChannel(client);
+        }
+    }, 60 * 60 * 1000); // Проверяем каждый час
 });
 
 client.on('messageCreate', async (message) => {
