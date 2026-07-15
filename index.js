@@ -1934,7 +1934,7 @@ commands.set('poll', {
 // ==================== СОБЫТИЯ ====================
 
 client.on('ready', () => {
-    console.log(`✅ Бот ${client.user.tag} запущен!`);
+    console.log(`✅ Бот ${client.user.tag} запущен! Version: ${BOT_VERSION}`);
     client.user.setActivity('!help | Сервер ZOHAN', { type: ActivityType.Playing });
 
     // Запуск Telegram бота (если настроен)
@@ -2338,7 +2338,7 @@ const server = http.createServer(async (req, res) => {
 
     if (url === '/healthcheck' || url === '/') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('OK - Zohan Mimo Bot is running! ' + BOT_VERSION);
+        res.end('OK - Zohan Mimo Bot ' + BOT_VERSION + ' @ ' + new Date().toISOString());
         return;
     }
 

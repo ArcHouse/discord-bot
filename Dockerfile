@@ -1,6 +1,5 @@
+# Force rebuild v3.1 - timestamp debug
 FROM node:22
-
-# Force rebuild v3 - fixed Russian encoding
 RUN apt-get update && apt-get install -y \
     python3 \
     build-essential \
