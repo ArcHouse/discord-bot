@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 // Настройки сервера (сохраняются между перезапусками)
+const fs = require('fs');
 const path = require('path');
 const CONFIG_FILE = path.join(__dirname, 'server-config.json');
 function loadConfig() {
