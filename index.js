@@ -1777,6 +1777,72 @@ commands.set('dellolcommands', {
     }
 });
 
+// --- УДАЛИТЬ LOL КАНАЛЫ (новости + гайды) ---
+
+commands.set('deletelolchannels', {
+    name: 'deletelolchannels',
+    description: 'Удалить каналы lol-новости и lol-гайды',
+    usage: '!deletelolchannels',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ!');
+        }
+
+        const deleted = [];
+        const channelNames = ['lol-новости', 'lol-novosti', 'lol-гайды', 'lol-gajdy', '⚔️-lol-гайды', '🎮-lol-новости'];
+
+        for (const name of channelNames) {
+            const ch = message.guild.channels.cache.find(c => c.name.includes(name));
+            if (ch) {
+                await ch.delete().catch(() => {});
+                deleted.push(ch.name);
+            }
+        }
+
+        if (deleted.length === 0) {
+            return message.reply('❌ Каналы lol не найдены!');
+        }
+
+        message.reply(`✅ Удалены каналы: ${deleted.join(', ')}`);
+    }
+});
+
+// --- ОЧИСТИТЬ КАНАЛ НОВОСТЕЙ ---
+
+commands.set('clearnews', {
+    name: 'clearnews',
+    description: 'Очистить канал от новостей (игровые новости)',
+    usage: '!clearnews',
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ Только админ!');
+        }
+
+        const newsChannel = message.guild.channels.cache.find(ch =>
+            ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')
+        );
+
+        if (!newsChannel) return message.reply('❌ Канал новостей не найден!');
+
+        try {
+            let deleted = 0;
+            let fetched;
+            do {
+                fetched = await newsChannel.messages.fetch({ limit: 100 });
+                const botMessages = fetched.filter(m => m.author.bot);
+                if (botMessages.size === 0) break;
+                await newsChannel.bulkDelete(botMessages).catch(() => {});
+                deleted += botMessages.size;
+                await new Promise(r => setTimeout(r, 1000));
+            } while (fetched.size >= 100);
+
+            message.reply(`✅ Удалено ${deleted} сообщений бота из канала ${newsChannel}`);
+        } catch (err) {
+            message.reply('❌ Ошибка при очистке: ' + err.message);
+        }
+    }
+});
+
 // --- ПОМОЩЬ ---
 
 commands.set('help', {
@@ -1978,112 +2044,8 @@ client.on('ready', () => {
         return hours.includes(now);
     }
 
-    // 📰 ИГРОВЫЕ НОВОСТИ - каждые 4 часа (10:00, 14:00, 18:00, 22:00)
-    const newsHours = [10, 14, 18, 22];
-    console.log(`📰 Игровые новости: ${newsHours.join(':00, ')}:00`);
-
-    // ⚔️ LOL TIER LIST - каждые 6 часов (09:00, 15:00, 21:00)
-    const tierListHours = [9, 15, 21];
-    console.log(`⚔️ LOL Tier List: ${tierListHours.join(':00, ')}:00`);
-
-    // 🛡 LOL СБОРКИ - каждые 8 часов (10:00, 18:00)
-    const buildsHours = [10, 18];
-    console.log(`🛡 LOL Сборки: ${buildsHours.join(':00, ')}:00`);
-
-    // 🏆 LOL РЕЙТИНГ - каждые 12 часов (12:00, 00:00)
-    const ratingHours = [0, 12];
-    console.log(`🏆 LOL Рейтинг: ${ratingHours.join(':00, ')}:00`);
-
-    // Проверяем каждые 30 минут
-    setInterval(async () => {
-        const currentHour = new Date().getHours();
-        console.log(`⏰ Проверяю время: ${currentHour}:00`);
-
-        // 🔴 Проверяем Twitch стримы каждые 5 минут
-        await checkTwitchStreams(client);
-
-        // 📰 Игровые новости
-        if (newsHours.includes(currentHour)) {
-            console.log('📰 Обновляю игровые новости...');
-            await postNewsToChannel(client);
-        }
-
-        // 🎮 LOL новости (в канал lol-новости)
-        if (newsHours.includes(currentHour)) {
-            console.log('🎮 Обновляю LOL новости...');
-            for (const [, guild] of client.guilds.cache) {
-                const lolNewsChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-новости') || ch.name.includes('lol-novosti')
-                );
-                if (lolNewsChannel) {
-                    console.log('🎮 Канал LOL новостей найден:', lolNewsChannel.name);
-                    const lolNews = await fetchLoLNews();
-                    console.log('🎮 Получено LOL новостей:', lolNews.length);
-                    for (const item of lolNews) {
-                        const embed = new EmbedBuilder()
-                            .setColor(0xffd700)
-                            .setTitle(`${item.emoji} ${item.title}`)
-                            .setDescription(item.content.substring(0, 400) + (item.content.length > 400 ? '...' : ''))
-                            .addFields(
-                                { name: '📰 Источник', value: item.source, inline: true }
-                            )
-                            .setURL(item.link)
-                            .setTimestamp();
-                        if (item.image) {
-                            try { embed.setImage(item.image); } catch (e) {}
-                        }
-                        await lolNewsChannel.send({ embeds: [embed] }).catch(() => {});
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                    }
-                }
-            }
-        }
-
-        // ⚔️ LOL Tier List (в канал lol-гайды)
-        if (tierListHours.includes(currentHour)) {
-            console.log('⚔️ Обновляю LOL Tier List...');
-            for (const [, guild] of client.guilds.cache) {
-                const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
-                );
-                if (lolGuidesChannel) {
-                    console.log('⚔️ Канал найден:', lolGuidesChannel.name);
-                    await lolGuidesChannel.send({ embeds: [createTierListEmbed()] }).catch(() => {});
-                }
-            }
-        }
-
-        // 🛡 LOL Сборки (в канал lol-гайды)
-        if (buildsHours.includes(currentHour)) {
-            console.log('🛡 Обновляю LOL Сборки...');
-            for (const [, guild] of client.guilds.cache) {
-                const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
-                );
-                if (lolGuidesChannel) {
-                    console.log('🛡 Канал найден:', lolGuidesChannel.name);
-                    await lolGuidesChannel.send({ embeds: [createBuildsEmbed('mid')] }).catch(() => {});
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    await lolGuidesChannel.send({ embeds: [createBuildsEmbed('adc')] }).catch(() => {});
-                }
-            }
-        }
-
-        // 🏆 LOL Рейтинг (в канал lol-гайды)
-        if (ratingHours.includes(currentHour)) {
-            console.log('🏆 Обновляю LOL Рейтинг...');
-            for (const [, guild] of client.guilds.cache) {
-                const lolGuidesChannel = guild.channels.cache.find(ch => 
-                    ch.name.includes('lol-гайды') || ch.name.includes('lol-gajdy')
-                );
-                if (lolGuidesChannel) {
-                    console.log('🏆 Канал найден:', lolGuidesChannel.name);
-                    await lolGuidesChannel.send({ embeds: [createRatingEmbed()] }).catch(() => {});
-                }
-            }
-        }
-
-    }, 30 * 60 * 1000); // Проверяем каждые 30 минут
+    // Авто-постинг новостей ОТКЛЮЧЁН — ручной запуск через HTTP-эндпоинты
+    console.log('📰 Авто-постинг новостей отключён. Используй HTTP-эндпоинты для ручного запуска.');
 });
 
 client.on('messageCreate', async (message) => {
@@ -2348,54 +2310,6 @@ const server = http.createServer(async (req, res) => {
     // Эндпоинты для публикации новостей (вызываются cron-job.org)
     const endpoints = {
         '/post/gaming-news': () => postNewsToChannel(client),
-        '/post/lol-news': async () => {
-            for (const [, guild] of client.guilds.cache) {
-                const ch = guild.channels.cache.find(c => c.name.includes('lol-новости') || c.name.includes('lol-novosti'));
-                if (ch) {
-                    const news = await fetchLoLNews();
-                    const embeds = [];
-                    for (const item of news) {
-                        const newsId = item.source + '-' + item.title;
-                        if (publishedLoLNews.has(newsId)) continue;
-                        const embed = new EmbedBuilder()
-                            .setColor(0xffd700)
-                            .setTitle(item.emoji + ' ' + item.title)
-                            .setDescription(item.content.substring(0, 400) + (item.content.length > 400 ? '...' : ''))
-                            .addFields({ name: 'Источник', value: item.source, inline: true })
-                            .setURL(item.link)
-                            .setTimestamp();
-                        if (item.image) { try { embed.setImage(item.image); } catch(e) {} }
-                        embeds.push(embed);
-                        publishedLoLNews.add(newsId);
-                    }
-                    for (let i = 0; i < embeds.length; i += 10) {
-                        await ch.send({ embeds: embeds.slice(i, i + 10) }).catch(() => {});
-                    }
-                }
-            }
-        },
-        '/post/tierlist': async () => {
-            for (const [, guild] of client.guilds.cache) {
-                const ch = guild.channels.cache.find(c => c.name.includes('lol-гайды') || c.name.includes('lol-gajdy'));
-                if (ch) await ch.send({ embeds: [createTierListEmbed()] }).catch(() => {});
-            }
-        },
-        '/post/builds': async () => {
-            for (const [, guild] of client.guilds.cache) {
-                const ch = guild.channels.cache.find(c => c.name.includes('lol-гайды') || c.name.includes('lol-gajdy'));
-                if (ch) {
-                    await ch.send({ embeds: createBuildsEmbed('mid') || [] }).catch(() => {});
-                    await new Promise(r => setTimeout(r, 2000));
-                    await ch.send({ embeds: createBuildsEmbed('adc') || [] }).catch(() => {});
-                }
-            }
-        },
-        '/post/rating': async () => {
-            for (const [, guild] of client.guilds.cache) {
-                const ch = guild.channels.cache.find(c => c.name.includes('lol-гайды') || c.name.includes('lol-gajdy'));
-                if (ch) await ch.send({ embeds: [createRatingEmbed()] }).catch(() => {});
-            }
-        }
     };
 
     if (endpoints[url]) {
@@ -2411,7 +2325,7 @@ const server = http.createServer(async (req, res) => {
         }
     } else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Not found. Available: /healthcheck, /post/gaming-news, /post/lol-news, /post/tierlist, /post/builds, /post/rating');
+        res.end('Not found. Available: /healthcheck, /post/gaming-news');
     }
 });
 const PORT = process.env.PORT || 3000;
