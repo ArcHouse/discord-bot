@@ -616,7 +616,7 @@ async function fetchLoLNews() {
     return topNews;
 }
 
-// Функция публикации новости в канал
+// Функция публикации новости в канал (ОДНО сообщение = ОДНО уведомление)
 async function postNewsToChannel(client) {
     try {
         for (const [, guild] of client.guilds.cache) {
@@ -638,11 +638,11 @@ async function postNewsToChannel(client) {
                 continue;
             }
 
-            let posted = 0;
-            const MAX_POSTS = 5;
+            const MAX_POSTS = 10;
+            const embeds = [];
 
             for (const item of news) {
-                if (posted >= MAX_POSTS) break;
+                if (embeds.length >= MAX_POSTS) break;
 
                 // Дедупликация по ссылке
                 if (item.link && publishedNews.has(item.link)) continue;
@@ -662,28 +662,28 @@ async function postNewsToChannel(client) {
                         { name: '📰 Источник', value: item.source, inline: true },
                         { name: '🕐 Дата', value: formatDate(item.date), inline: true }
                     )
-                    .setURL(item.link)
-                    .setTimestamp();
+                    .setURL(item.link);
 
                 if (item.image) {
                     try { embed.setImage(item.image); } catch (err) {}
                 }
 
-                // Отправляем БЕЗ уведомлений (flags: 4096 = SUPPRESS_NOTIFICATIONS)
-                await newsChannel.send({ embeds: [embed], flags: 4096 }).catch(err => {
-                    console.error('❌ Ошибка отправки:', err.message);
-                });
+                embeds.push(embed);
 
                 // Сохраняем для дедупликации
                 if (item.link) publishedNews.add(item.link);
                 publishedNews.add('title:' + titleKey);
-                posted++;
+            }
 
-                await new Promise(resolve => setTimeout(resolve, 2000));
+            // Отправляем ВСЕ новости ОДНИМ сообщением (1 уведомление)
+            if (embeds.length > 0) {
+                await newsChannel.send({ embeds, flags: 4096 }).catch(err => {
+                    console.error('❌ Ошибка отправки:', err.message);
+                });
             }
 
             savePublishedNews();
-            console.log(`✅ Опубликовано ${posted} новых новостей`);
+            console.log(`✅ Опубликовано ${embeds.length} новых новостей (1 сообщение)`);
         }
     } catch (err) {
         console.error('❌ Ошибка публикации новостей:', err);
