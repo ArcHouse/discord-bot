@@ -737,23 +737,24 @@ async function translateToRussian(text) {
         return cleaned;
     }
 
-    // Пробуем Google Translate (бесплатный, без API-ключа)
-    try {
-        const encodedText = encodeURIComponent(cleaned.substring(0, 1000));
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ru&dt=t&q=${encodedText}`;
-        const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (response.ok) {
-            const data = await response.json();
-            // Google возвращает массив массивов [[["перевод","оригинал",...],...]]
-            if (data && data[0]) {
-                const translated = data[0].map(item => item[0]).join('');
-                if (translated && translated !== cleaned) {
-                    return translated;
+    // DeepL API (бесплатный тариф — 500K символов/мес)
+    const DEEPL_KEY = process.env.DEEPL_API_KEY;
+    if (DEEPL_KEY) {
+        try {
+            const encodedText = encodeURIComponent(cleaned.substring(0, 1000));
+            const response = await fetch(
+                `https://api-free.deepl.com/v2/translate?auth_key=${DEEPL_KEY}&text=${encodedText}&source_lang=EN&target_lang=RU`,
+                { signal: AbortSignal.timeout(8000) }
+            );
+            if (response.ok) {
+                const data = await response.json();
+                if (data.translations && data.translations[0]?.text) {
+                    return data.translations[0].text;
                 }
             }
+        } catch (e) {
+            console.log('⚠️ DeepL ошибка:', e.message);
         }
-    } catch (e) {
-        console.log('⚠️ Google Translate ошибка:', e.message);
     }
 
     // Fallback — возвращаем текст как есть

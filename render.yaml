@@ -14,3 +14,5 @@ services:
         value: "general"
       - key: AUTOROLE
         value: "@Member"
+      - key: DEEPL_API_KEY
+        sync: false
