@@ -737,30 +737,23 @@ async function translateToRussian(text) {
         return cleaned;
     }
 
+    // Пробуем Google Translate (бесплатный, без API-ключа)
     try {
-        for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-                const encodedText = encodeURIComponent(cleaned.substring(0, 500));
-                const response = await fetch(
-                    `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=en|ru&de=bot@discord.com`,
-                    { signal: AbortSignal.timeout(10000) }
-                );
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.responseStatus === 200 && data.responseData?.translatedText) {
-                        const translated = data.responseData.translatedText;
-                        if (translated && translated !== cleaned && !translated.includes('MYMEMORY WARNING')) {
-                            return translated;
-                        }
-                    }
+        const encodedText = encodeURIComponent(cleaned.substring(0, 1000));
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ru&dt=t&q=${encodedText}`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (response.ok) {
+            const data = await response.json();
+            // Google возвращает массив массивов [[["перевод","оригинал",...],...]]
+            if (data && data[0]) {
+                const translated = data[0].map(item => item[0]).join('');
+                if (translated && translated !== cleaned) {
+                    return translated;
                 }
-                await new Promise(r => setTimeout(r, 2000));
-            } catch (e) {
-                await new Promise(r => setTimeout(r, 2000));
             }
         }
-    } catch (err) {
-        console.error('⚠️ Ошибка перевода:', err.message);
+    } catch (e) {
+        console.log('⚠️ Google Translate ошибка:', e.message);
     }
 
     // Fallback — возвращаем текст как есть
