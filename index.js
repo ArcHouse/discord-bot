@@ -27,17 +27,17 @@ const clientOptions = {
 };
 
 // Если указан прокси - добавляем поддержку
+let proxyAgent = null;
 if (process.env.PROXY) {
     const { HttpsProxyAgent } = require('https-proxy-agent');
     const { SocksProxyAgent } = require('socks-proxy-agent');
 
-    let agent;
     if (process.env.PROXY.startsWith('socks')) {
-        agent = new SocksProxyAgent(process.env.PROXY);
+        proxyAgent = new SocksProxyAgent(process.env.PROXY);
     } else {
-        agent = new HttpsProxyAgent(process.env.PROXY);
+        proxyAgent = new HttpsProxyAgent(process.env.PROXY);
     }
-    clientOptions.rest = { agent };
+    clientOptions.rest = { agent: proxyAgent };
     console.log(`🔗 Используется прокси: ${process.env.PROXY}`);
 }
 
@@ -737,27 +737,50 @@ async function translateToRussian(text) {
         return cleaned;
     }
 
-    // DeepL API (бесплатный тариф — 500K символов/мес)
+    // 1) DeepL API (бесплатный тариф — 500K символов/мес)
     const DEEPL_KEY = process.env.DEEPL_API_KEY;
     if (DEEPL_KEY) {
         try {
             const encodedText = encodeURIComponent(cleaned.substring(0, 1000));
+            const fetchOptions = { signal: AbortSignal.timeout(8000) };
+            if (proxyAgent) fetchOptions.agent = proxyAgent;
             const response = await fetch(
                 `https://api-free.deepl.com/v2/translate?auth_key=${DEEPL_KEY}&text=${encodedText}&source_lang=EN&target_lang=RU`,
-                { signal: AbortSignal.timeout(8000) }
+                fetchOptions
             );
             if (response.ok) {
                 const data = await response.json();
                 if (data.translations && data.translations[0]?.text) {
                     return data.translations[0].text;
                 }
+            } else {
+                console.log(`⚠️ DeepL ошибка HTTP ${response.status}`);
             }
         } catch (e) {
             console.log('⚠️ DeepL ошибка:', e.message);
         }
     }
 
-    // Fallback — возвращаем текст как есть
+    // 2) Fallback — Google Translate (бесплатный, без ключа)
+    try {
+        const encodedText = encodeURIComponent(cleaned.substring(0, 1000));
+        const fetchOptions = { signal: AbortSignal.timeout(8000) };
+        if (proxyAgent) fetchOptions.agent = proxyAgent;
+        const response = await fetch(
+            `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ru&dt=t&q=${encodedText}`,
+            fetchOptions
+        );
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data[0]) {
+                const translated = data[0].map(part => part[0]).join('');
+                if (translated) return translated;
+            }
+        }
+    } catch (e) {
+        console.log('⚠️ Google Translate ошибка:', e.message);
+    }
+
     return cleaned;
 }
 
