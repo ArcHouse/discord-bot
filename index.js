@@ -1,9 +1,11 @@
-const BOT_VERSION = 'v3.2.0-fixed-http';
+const BOT_VERSION = 'v3.3.0-news-reliability';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
 const RSSParser = require('rss-parser');
+const { createPublisher, selectChannel, createScheduler, httpUrl } = require('./lib/news');
+const { getTestChannel } = require('./lib/news-test-channel');
 const TelegramBot = require('node-telegram-bot-api');
 const dotenv = require('dotenv');
 
@@ -84,6 +86,8 @@ async function sendEmbedToTelegram(embed, fromDiscord = true) {
 // ==================== ИГРОВЫЕ НОВОСТИ ====================
 
 const rssParser = new RSSParser();
+// Separate parser keeps the existing LoL path unchanged.
+const gameRssParser = new RSSParser({ timeout: 10000, headers: { 'User-Agent': 'Zohan-News/3.3' } });
 
 // RSS-ленты игровых новостей (только рабочие!)
 const RSS_FEEDS = [
@@ -218,36 +222,7 @@ async function checkTwitchStreams(client) {
     }
 }
 
-// Хранилище опубликованных новостей (чтобы не дублировать) — сохраняется в файл
-const NEWS_FILE = path.join(__dirname, 'published-news.json');
-const publishedNews = new Set();
-
-// Загрузка опубликованных новостей из файла
-function loadPublishedNews() {
-    try {
-        if (fs.existsSync(NEWS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(NEWS_FILE, 'utf8'));
-            data.forEach(url => publishedNews.add(url));
-            console.log(`📰 Загружено ${publishedNews.size} опубликованных новостей`);
-        }
-    } catch (e) {}
-}
-
-// Сохранение в файл (не чаще раза в 5 минут)
-let lastNewsSave = 0;
-function savePublishedNews() {
-    const now = Date.now();
-    if (now - lastNewsSave < 5 * 60 * 1000) return;
-    lastNewsSave = now;
-    try {
-        // Храним только последние 500 записей чтобы файл не рос бесконечно
-        const arr = Array.from(publishedNews);
-        const trimmed = arr.slice(-500);
-        fs.writeFileSync(NEWS_FILE, JSON.stringify(trimmed), 'utf8');
-    } catch (e) {}
-}
-
-loadPublishedNews();
+// Production deduplication is recovered from Discord history, per channel.
 const publishedLoLNews = new Set();
 
 // ==================== LOL ДАННЫЕ (OP.GG УРОВЕНЬ) ====================
@@ -513,10 +488,11 @@ function createRatingEmbed() {
 // Функция получения новостей
 async function fetchGameNews() {
     const allNews = [];
+    let successfulFeeds = 0;
 
-    for (const feed of RSS_FEEDS) {
+    await Promise.all(RSS_FEEDS.map(async feed => {
         try {
-            const data = await rssParser.parseURL(feed.url);
+            const data = await gameRssParser.parseURL(feed.url);
             const items = data.items.slice(0, 5).map(item => {
                 // Извлекаем картинку из новости
                 let image = null;
@@ -547,11 +523,14 @@ async function fetchGameNews() {
                 };
             });
             allNews.push(...items);
+            successfulFeeds++;
         } catch (err) {
-            console.error(`❌ Ошибка RSS ${feed.name}:`, err.message);
+            console.error(`[news] RSS failed source=${feed.name} code=${err.code || err.name}`);
         }
-    }
+    }));
 
+    if (!successfulFeeds) throw Object.assign(new Error('All gaming RSS feeds failed'), { code: 'NEWS_RSS_ALL_FAILED' });
+    console.log(`[news] RSS sources=${successfulFeeds}/${RSS_FEEDS.length} items=${allNews.length}`);
     // Сортируем по дате (новые сверху)
     allNews.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -616,78 +595,54 @@ async function fetchLoLNews() {
     return topNews;
 }
 
-// Функция публикации новости в канал (ОДНО сообщение = ОДНО уведомление)
-async function postNewsToChannel(client) {
-    try {
-        for (const [, guild] of client.guilds.cache) {
-            const newsChannel = guild.channels.cache.find(ch =>
-                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')) &&
-                !ch.name.includes('lol')
-            );
-            if (!newsChannel) {
-                console.log('⚠️ Канал новостей не найден:', guild.name);
-                continue;
-            }
-
-            console.log(`📰 Проверяю новости для ${guild.name}...`);
-            const news = await fetchGameNews();
-            console.log(`📰 Получено ${news.length} новостей`);
-
-            if (news.length === 0) {
-                console.log('⚠️ Нет новостей');
-                continue;
-            }
-
-            const MAX_POSTS = 10;
-            const embeds = [];
-
-            for (const item of news) {
-                if (embeds.length >= MAX_POSTS) break;
-
-                // Дедупликация по ссылке
-                if (item.link && publishedNews.has(item.link)) continue;
-                // Дедупликация по заголовку
-                const titleKey = item.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
-                if (publishedNews.has('title:' + titleKey)) continue;
-
-                // Переводим на русский
-                const translatedTitle = await translateToRussian(item.title);
-                const translatedContent = await translateToRussian(item.content);
-
-                const embed = new EmbedBuilder()
-                    .setColor(getColorBySource(item.source))
-                    .setTitle(`${item.emoji} ${translatedTitle}`)
-                    .setDescription(translatedContent.substring(0, 500) + (translatedContent.length > 500 ? '...' : ''))
-                    .addFields(
-                        { name: '📰 Источник', value: item.source, inline: true },
-                        { name: '🕐 Дата', value: formatDate(item.date), inline: true }
-                    )
-                    .setURL(item.link);
-
-                if (item.image) {
-                    try { embed.setImage(item.image); } catch (err) {}
-                }
-
-                embeds.push(embed);
-
-                // Сохраняем для дедупликации
-                if (item.link) publishedNews.add(item.link);
-                publishedNews.add('title:' + titleKey);
-            }
-
-            // Отправляем ВСЕ новости ОДНИМ сообщением (1 уведомление)
-            if (embeds.length > 0) {
-                await newsChannel.send({ embeds, flags: 4096 }).catch(err => {
-                    console.error('❌ Ошибка отправки:', err.message);
-                });
-            }
-
-            savePublishedNews();
-            console.log(`✅ Опубликовано ${embeds.length} новых новостей (1 сообщение)`);
-        }
-    } catch (err) {
-        console.error('❌ Ошибка публикации новостей:', err);
+// All triggers share per-channel locks and Discord-backed deduplication.
+function makeNewsPublisher() { return createPublisher({
+    botId: () => client.user.id,
+    fetchNews: fetchGameNews,
+    async buildEmbed(item) {
+        const [title, content] = await Promise.all([translateToRussian(item.title), translateToRussian(item.content)]);
+        const embed = new EmbedBuilder()
+            .setColor(getColorBySource(item.source))
+            .setTitle((item.emoji + ' ' + (title || item.title)).substring(0, 256))
+            .setDescription((content || 'Подробнее по ссылке').substring(0, 500))
+            .addFields(
+                { name: '📰 Источник', value: item.source, inline: true },
+                { name: '🕐 Дата статьи', value: formatDate(item.date), inline: true }
+            ).setURL(item.link);
+        if (httpUrl(item.image)) embed.setImage(httpUrl(item.image));
+        return embed.toJSON();
     }
+}); }
+const newsPublisher = makeNewsPublisher();
+const testNewsPublisher = makeNewsPublisher();
+
+async function postNewsToChannel(client) {
+    if (process.env.NEWS_PRODUCTION_ENABLED === 'false') throw new Error('Production news disabled for testing');
+    if (!client.isReady()) throw new Error('Discord is not ready');
+    const failures = [];
+    for (const [, guild] of client.guilds.cache) {
+        let selected = false;
+        try {
+            await guild.channels.fetch();
+            // Explicit ID scopes production delivery to that channel's server.
+            if (process.env.NEWS_CHANNEL_ID && !guild.channels.cache.has(process.env.NEWS_CHANNEL_ID)) continue;
+            const channel = selectChannel(guild.channels.cache, process.env.NEWS_CHANNEL_ID);
+            selected = true;
+            await newsPublisher.publish(channel);
+        } catch (err) {
+            if (!selected) {
+                newsPublisher.status.lastAttempt = new Date().toISOString();
+                newsPublisher.status.lastResult = 'failed';
+                newsPublisher.status.failures++;
+            }
+            console.error('[news] guild=' + guild.id + ' failed: ' + (err.code || err.name));
+            failures.push(err);
+        }
+    }
+    if (process.env.NEWS_CHANNEL_ID && ![...client.guilds.cache.values()].some(g => g.channels.cache.has(process.env.NEWS_CHANNEL_ID))) {
+        throw new Error('NEWS_CHANNEL_ID was not found in any accessible server');
+    }
+    if (failures.length) throw new AggregateError(failures, 'News delivery failed in ' + failures.length + ' server(s)');
 }
 
 // Цвета по источникам
@@ -711,7 +666,8 @@ function formatDate(dateStr) {
             month: '2-digit',
             year: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: process.env.NEWS_TIMEZONE || 'Europe/Moscow'
         });
     } catch {
         return 'Недавно';
@@ -741,12 +697,11 @@ async function translateToRussian(text) {
     const DEEPL_KEY = process.env.DEEPL_API_KEY;
     if (DEEPL_KEY) {
         try {
-            const encodedText = encodeURIComponent(cleaned.substring(0, 1000));
             const fetchOptions = { signal: AbortSignal.timeout(8000) };
             if (proxyAgent) fetchOptions.agent = proxyAgent;
             const response = await fetch(
-                `https://api-free.deepl.com/v2/translate?auth_key=${DEEPL_KEY}&text=${encodedText}&source_lang=EN&target_lang=RU`,
-                fetchOptions
+                'https://api-free.deepl.com/v2/translate',
+                { ...fetchOptions, method: 'POST', headers: { Authorization: 'DeepL-Auth-Key ' + DEEPL_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ text: [cleaned.substring(0, 1000)], source_lang: 'EN', target_lang: 'RU' }) }
             );
             if (response.ok) {
                 const data = await response.json();
@@ -757,7 +712,7 @@ async function translateToRussian(text) {
                 console.log(`⚠️ DeepL ошибка HTTP ${response.status}`);
             }
         } catch (e) {
-            console.log('⚠️ DeepL ошибка:', e.message);
+            console.log('⚠️ DeepL ошибка:', e.code || e.name);
         }
     }
 
@@ -778,7 +733,7 @@ async function translateToRussian(text) {
             }
         }
     } catch (e) {
-        console.log('⚠️ Google Translate ошибка:', e.message);
+        console.log('⚠️ Google Translate ошибка:', e.code || e.name);
     }
 
     return cleaned;
@@ -787,6 +742,22 @@ async function translateToRussian(text) {
 // ==================== КОМАНДЫ ====================
 
 const commands = new Map();
+
+commands.set('newstest', {
+    name: 'newstest',
+    description: 'Закрытый тест рассылки (только владелец)',
+    async execute(message) {
+        if (!message.guild || message.author.id !== message.guild.ownerId) return;
+        try {
+            const channel = await getTestChannel(message.guild, message.author.id, client.user.id, PermissionsBitField.Flags);
+            await testNewsPublisher.publish(channel);
+            await message.reply('✅ Тест проверен в <#' + channel.id + '>. История основной рассылки не затронута. Администраторы Discord могут видеть закрытые каналы.');
+        } catch (err) {
+            console.error('[news-test] failed code=' + (err.code || err.name));
+            await message.reply('❌ Тест не выполнен. Проверьте права тестового канала и журнал Render. Основная рассылка не запускалась.');
+        }
+    }
+});
 
 // --- МОДЕРАЦИЯ ---
 
@@ -1267,7 +1238,7 @@ commands.set('gamenews', {
             await new Promise(r => setTimeout(r, 2000));
 
             // Приветствия
-            await ch1.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('Последние новости из мира игр!\n\nGTA, Cyberpunk, Call of Duty и другие.\nПеревод на русский язык.\nАвто-обновление каждые 4 часа.').setTimestamp()] });
+            await ch1.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('Последние новости из мира игр!\n\nGTA, Cyberpunk, Call of Duty и другие.\nПеревод на русский язык.\nРасписание: 08:00, 14:00, 20:00 (NEWS_TIMEZONE, по умолчанию Москва).').setTimestamp()] });
             await ch2.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Последние новости League of Legends!\n\nПатч-ноуты, новые чемпионы, скины.\nТурнирные новости.\nАвто-обновление.').setTimestamp()] });
             await ch3.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ И СТАТИСТИКА').setDescription('Tier List, сборки, рейтинги!\n\nДанные: OP.GG | Патч 16.13\nАвто-обновление каждые 6-12 часов.').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
             await ch3.send({ embeds: [createTierListEmbed()] });
@@ -1382,11 +1353,11 @@ commands.set('news', {
             const successEmbed = new EmbedBuilder()
                 .setColor(0x00ff00)
                 .setTitle('✅ Новости обновлены!')
-                .setDescription('Новые новости опубликованы в канале **🎮-новости**')
+                .setDescription('Проверка рассылки завершена. Новые подходящие новости отправлены, если они были.')
                 .setTimestamp();
             msg.edit({ embeds: [successEmbed] });
         } catch (err) {
-            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription('Сбой рассылки: проверьте канал, права и журнал Render.')] });
         }
     }
 });
@@ -1943,7 +1914,7 @@ commands.set('setupnews', {
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
             .setTitle('🎮 Игровые новости')
-            .setDescription('Сюда бот будет автоматически постить игровые новости на русском языке с картинками.\n\n📰 Новости появляются 3 раза в день: 08:00, 14:00, 20:00')
+            .setDescription('Сюда бот будет автоматически постить игровые новости на русском языке с картинками.\n\n📰 Расписание: 08:00, 14:00, 20:00 (NEWS_TIMEZONE, по умолчанию Москва). На спящем сервере возможна задержка.')
             .setTimestamp();
 
         await newChannel.send({ embeds: [embed] });
@@ -2150,23 +2121,19 @@ client.on('ready', () => {
 
     // ==================== РАСПИСАНИЕ ОБНОВЛЕНИЙ ====================
 
-    // Функция проверки времени
-    function isUpdateHour(hours) {
-        const now = new Date().getHours();
-        return hours.includes(now);
-    }
-
-    // Авто-постинг игровых новостей каждые 6 часов (08:00, 14:00, 20:00)
-    const AUTO_NEWS_HOURS = [8, 14, 20];
-    console.log(`📰 Авто-постинг новостей: ${AUTO_NEWS_HOURS.join(':00, ')}:00`);
-
-    setInterval(async () => {
-        const currentHour = new Date().getHours();
-        if (AUTO_NEWS_HOURS.includes(currentHour)) {
-            console.log('📰 Авто-обновление игровых новостей...');
-            await postNewsToChannel(client);
+    // Minute polling, explicit timezone, latest-slot catch-up after wake.
+    try {
+        if (process.env.NEWS_PRODUCTION_ENABLED === 'false') {
+            console.log('[news] production disabled; use owner-only newstest');
+            return;
         }
-    }, 60 * 60 * 1000); // Проверяем каждый час
+        const tickNews = createScheduler({ run: () => postNewsToChannel(client), timeZone: process.env.NEWS_TIMEZONE || 'Europe/Moscow' });
+        console.log('[news] schedule=08:00,14:00,20:00 timezone=' + (process.env.NEWS_TIMEZONE || 'Europe/Moscow'));
+        // No automatic post on startup: first tick is after one minute.
+        setInterval(tickNews, 60 * 1000);
+    } catch {
+        console.error('[news] invalid NEWS_TIMEZONE; internal scheduler disabled');
+    }
 });
 
 client.on('messageCreate', async (message) => {
@@ -2421,6 +2388,12 @@ setInterval(async () => {
 
 const server = http.createServer(async (req, res) => {
     const url = req.url.split('?')[0];
+    if (url === '/ready') {
+        const ready = client.isReady();
+        res.writeHead(ready ? 200 : 503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ ready, productionEnabled: process.env.NEWS_PRODUCTION_ENABLED !== 'false', news: newsPublisher.status }));
+        return;
+    }
 
     if (url === '/healthcheck' || url === '/') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -2434,6 +2407,10 @@ const server = http.createServer(async (req, res) => {
     };
 
     if (endpoints[url]) {
+        if (!['GET', 'POST'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, POST' }); res.end(); return; }
+        if (process.env.NEWS_CRON_SECRET && req.headers.authorization !== 'Bearer ' + process.env.NEWS_CRON_SECRET) {
+            res.writeHead(401); res.end('Unauthorized'); return;
+        }
         try {
             await endpoints[url]();
             res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -2441,8 +2418,8 @@ const server = http.createServer(async (req, res) => {
             console.log('📰 Cron triggered: ' + url);
         } catch (err) {
             res.writeHead(500, { 'Content-Type': 'text/plain' });
-            res.end('Error: ' + err.message);
-            console.error('❌ Cron error:', url, err.message);
+            res.end('News delivery failed; inspect Render logs');
+            console.error('❌ Cron error:', url, err.code || err.name);
         }
     } else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -2781,8 +2758,8 @@ commands.set('rank', {
     }
 });
 
-// Сохраняем опубликованные новости при завершении
-process.on('SIGTERM', () => { savePublishedNews(); process.exit(0); });
-process.on('SIGINT', () => { savePublishedNews(); process.exit(0); });
+// Discord message history is the durable news record.
+process.on('SIGTERM', () => { process.exit(0); });
+process.on('SIGINT', () => { process.exit(0); });
 
 client.login(process.env.TOKEN);
