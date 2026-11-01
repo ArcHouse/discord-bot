@@ -6,6 +6,7 @@ const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityTy
 const RSSParser = require('rss-parser');
 const { createPublisher, selectChannel, createScheduler, httpUrl } = require('./lib/news');
 const { getTestChannel } = require('./lib/news-test-channel');
+const { cronAuthorized, excerpt, auditGuild } = require('./lib/channel-audit');
 const TelegramBot = require('node-telegram-bot-api');
 const dotenv = require('dotenv');
 
@@ -176,20 +177,20 @@ async function checkTwitchStreams(client) {
         try {
             // Используем публичный API для проверки статуса
             const url = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${channel.login}-320x180.jpg`;
-            
+
             // Проверяем через fetch
             const response = await fetch(url, { method: 'HEAD' });
             const isLive = response.ok;
-            
+
             const wasLive = streamStatus.get(channel.login) || false;
-            
+
             // Если стрим начался
             if (isLive && !wasLive) {
                 console.log(`🔴 ${channel.name} начал стрим!`);
-                
+
                 // Ищем канал объявления
                 for (const [, guild] of client.guilds.cache) {
-                    const announceChannel = guild.channels.cache.find(ch => 
+                    const announceChannel = guild.channels.cache.find(ch =>
                         ch.name.includes('объявления') || ch.name.includes('announce')
                     );
                     if (announceChannel) {
@@ -208,14 +209,14 @@ async function checkTwitchStreams(client) {
                     }
                 }
             }
-            
+
             // Если стрим закончился
             if (!isLive && wasLive) {
                 console.log(`⚫ ${channel.name} закончил стрим`);
             }
-            
+
             streamStatus.set(channel.login, isLive);
-            
+
         } catch (err) {
             console.log('⚠️ Twitch ошибка:', err.message.substring(0, 50));
         }
@@ -603,8 +604,8 @@ function makeNewsPublisher() { return createPublisher({
         const [title, content] = await Promise.all([translateToRussian(item.title), translateToRussian(item.content)]);
         const embed = new EmbedBuilder()
             .setColor(getColorBySource(item.source))
-            .setTitle((item.emoji + ' ' + (title || item.title)).substring(0, 256))
-            .setDescription((content || 'Подробнее по ссылке').substring(0, 500))
+            .setTitle(excerpt(item.emoji + ' ' + (title || item.title), 256))
+            .setDescription(excerpt(content || 'Подробнее по ссылке', 500))
             .addFields(
                 { name: '📰 Источник', value: item.source, inline: true },
                 { name: '🕐 Дата статьи', value: formatDate(item.date), inline: true }
@@ -755,6 +756,31 @@ commands.set('newstest', {
         } catch (err) {
             console.error('[news-test] failed code=' + (err.code || err.name));
             await message.reply('❌ Тест не выполнен. Проверьте права тестового канала и журнал Render. Основная рассылка не запускалась.');
+        }
+    }
+});
+
+commands.set('serveraudit', {
+    name: 'serveraudit',
+    description: 'Проверка каналов и прав (только владелец, без изменений)',
+    async execute(message) {
+        if (!message.guild || message.author.id !== message.guild.ownerId) return;
+        try {
+            const report = await auditGuild(message.guild, message.author.id, client.user.id, process.env.NEWS_CHANNEL_ID);
+            const lines = [
+                'Проверка каналов и прав. Настройки не изменены.',
+                'Каналов: ' + report.channelCount + '. Канал новостей: ' + (report.targetId || 'не выбран') + '.',
+                'Основная рассылка: ' + (process.env.NEWS_PRODUCTION_ENABLED === 'false' ? 'выключена' : 'включена') + '.',
+                ...report.findings.map(f => '• ' + f)
+            ];
+            if (!report.findings.length) lines.push('В проверенных настройках проблем не обнаружено. Содержание сообщений и доставка новостей здесь не проверялись.');
+            await message.author.send({ content: 'Отчёт по серверу в приложенном файле.',
+                files: [{ attachment: Buffer.from(lines.join('\n'), 'utf8'), name: 'server-audit.txt' }],
+                allowedMentions: { parse: [] } });
+            await message.reply({ content: '✅ Отчёт отправлен тебе в личные сообщения. Настройки не изменены.', allowedMentions: { parse: [] } });
+        } catch (err) {
+            console.error('[server-audit] failed code=' + (err.code || err.name));
+            await message.reply({ content: '❌ Не удалось завершить проверку или отправить отчёт. Проверь личные сообщения и журнал Render.', allowedMentions: { parse: [] } });
         }
     }
 });
@@ -1292,30 +1318,30 @@ commands.set('postwelcome', {
 
         // Получаем ВСЕ текстовые каналы
         const channels = guild.channels.cache.filter(ch => ch.type === 0);
-        
+
         let sent = 0;
 
         for (const [, channel] of channels) {
             try {
                 // Проверяем название канала
                 const name = channel.name;
-                
+
                 if (name.includes('игровые') && name.includes('новости')) {
                     await channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('GTA, Cyberpunk, Call of Duty и другие игры!\nАвто-обновление каждые 4 часа.').setTimestamp()] });
                     sent++;
                 }
-                
+
                 if (name.includes('lol') && name.includes('новости')) {
                     await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Патч-ноуты, скины, турниры!\nАвто-обновление.').setTimestamp()] });
                     sent++;
                 }
-                
+
                 if (name.includes('lol') && name.includes('гайды')) {
                     await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ').setDescription('Tier List, сборки, рейтинги!\nПишите команды в 💬-lol-команды').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
                     await channel.send({ embeds: [createTierListEmbed()] });
                     sent++;
                 }
-                
+
                 if (name.includes('lol') && name.includes('команды')) {
                     await channel.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь!\n\n!tierlist - Tier List\n!top mid - Топ чемпионов\n!builds mid - Сборки\n!rating - Рейтинг\n!counter Ahri - Статистика\n!lolnews - Новости').setTimestamp()] });
                     sent++;
@@ -2408,7 +2434,7 @@ const server = http.createServer(async (req, res) => {
 
     if (endpoints[url]) {
         if (!['GET', 'POST'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, POST' }); res.end(); return; }
-        if (process.env.NEWS_CRON_SECRET && req.headers.authorization !== 'Bearer ' + process.env.NEWS_CRON_SECRET) {
+        if (!cronAuthorized(process.env.NEWS_CRON_SECRET, req.headers.authorization)) {
             res.writeHead(401); res.end('Unauthorized'); return;
         }
         try {
