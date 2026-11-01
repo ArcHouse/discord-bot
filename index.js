@@ -44,7 +44,7 @@ if (process.env.PROXY) {
         proxyAgent = new HttpsProxyAgent(process.env.PROXY);
     }
     clientOptions.rest = { agent: proxyAgent };
-    console.log(`🔗 Используется прокси: ${process.env.PROXY}`);
+    console.log('🔗 Прокси настроен');
 }
 
 const client = new Client(clientOptions);
@@ -1999,21 +1999,20 @@ client.on('messageCreate', async (message) => {
 
 // РЕАКЦИИ: обработка Reaction Roles и Верификация
 client.on('messageReactionAdd', async (reaction, user) => {
-    if (user.bot) return;
-    if (reaction.message.partial) await reaction.message.fetch();
-
-    const guild = reaction.message.guild;
-    const member = guild.members.cache.get(user.id);
-
-    // Верификация
-    if (reaction.emoji.name === '✅') {
-        const verifiedRole = guild.roles.cache.find(r => r.name === 'Verified');
-        if (verifiedRole && !member.roles.cache.has(verifiedRole.id)) {
-            await member.roles.add(verifiedRole).catch(() => {});
-            const ch = guild.channels.cache.find(ch => ch.name === '👋-общение');
-            if (ch) ch.send(`✅ ${member} верифицирован! Добро пожаловать!`).then(m => setTimeout(() => m.delete(), 5000));
-        }
-    }
+    if (user.bot || reaction.emoji.name !== '✅') return;
+    try {
+        if (reaction.message.partial) await reaction.message.fetch();
+        const message = reaction.message;
+        const guild = message.guild;
+        if (!guild || guild.id !== process.env.SERVER_CONTROL_GUILD_ID || message.author?.id !== client.user.id) return;
+        if (!message.embeds?.some(embed => embed.title === '✅ Верификация')) return;
+        const matches = [...guild.roles.cache.values()].filter(role => role.name === 'Verified');
+        if (matches.length !== 1) return;
+        const role = matches[0];
+        if (role.managed || !role.editable || role.permissions.bitfield !== 0n) return;
+        const member = await guild.members.fetch(user.id);
+        if (!member.roles.cache.has(role.id)) await member.roles.add(role);
+    } catch (error) { console.error('[verification] failed code=' + (error.code || error.name)); }
 });
 
 // РОЗЫГРЫШИ: обработка таймеров

@@ -2,3 +2,11 @@ node_modules/
 .env
 server-config.json
 .local/
+
+# Local credentials must never be committed
+.env.*
+!.env.example
+control-key.txt
+server-control.json
+*.key
+*.p12
