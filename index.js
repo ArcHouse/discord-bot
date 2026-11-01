@@ -8,6 +8,7 @@ const { createPublisher, selectChannel, createScheduler, httpUrl } = require('./
 const { getTestChannel } = require('./lib/news-test-channel');
 const { cronAuthorized, excerpt, auditGuild } = require('./lib/channel-audit');
 const { createControl } = require('./lib/server-control');
+const { createSoundCloudSync } = require('./lib/soundcloud-sync');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -46,6 +47,7 @@ if (process.env.PROXY) {
 
 const client = new Client(clientOptions);
 const serverControl = createControl({ client });
+const soundcloudSync = createSoundCloudSync({ client, parser: new RSSParser({ timeout: 10000, headers: { 'User-Agent': 'ArcHouse-Music/1.0' } }) });
 
 // ==================== ИГРОВЫЕ НОВОСТИ ====================
 
@@ -1991,6 +1993,11 @@ client.once('clientReady', () => {
     console.log(`✅ Бот ${client.user.tag} запущен! Version: ${BOT_VERSION}`);
     client.user.setActivity('!help | Сервер ZOHAN', { type: ActivityType.Playing });
 
+    if (soundcloudSync.status.enabled) {
+        soundcloudSync.tick();
+        setInterval(() => soundcloudSync.tick(), 5 * 60 * 1000);
+    }
+
     // ==================== РАСПИСАНИЕ ОБНОВЛЕНИЙ ====================
 
     // Minute polling, explicit timezone, latest-slot catch-up after wake.
@@ -2268,7 +2275,7 @@ const server = http.createServer(async (req, res) => {
     if (url === '/ready') {
         const ready = client.isReady();
         res.writeHead(ready ? 200 : 503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-        res.end(JSON.stringify({ ready, productionEnabled: process.env.NEWS_PRODUCTION_ENABLED !== 'false', news: newsPublisher.status }));
+        res.end(JSON.stringify({ ready, productionEnabled: process.env.NEWS_PRODUCTION_ENABLED !== 'false', news: newsPublisher.status, soundcloud: soundcloudSync.status }));
         return;
     }
 
