@@ -7,6 +7,7 @@ const RSSParser = require('rss-parser');
 const { createPublisher, selectChannel, createScheduler, httpUrl } = require('./lib/news');
 const { getTestChannel } = require('./lib/news-test-channel');
 const { cronAuthorized, excerpt, auditGuild } = require('./lib/channel-audit');
+const { createControl } = require('./lib/server-control');
 const TelegramBot = require('node-telegram-bot-api');
 const dotenv = require('dotenv');
 
@@ -45,6 +46,7 @@ if (process.env.PROXY) {
 }
 
 const client = new Client(clientOptions);
+const serverControl = createControl({ client });
 
 // ==================== TELEGRAM BOT ====================
 
@@ -2351,6 +2353,10 @@ setInterval(async () => {
 
 const server = http.createServer(async (req, res) => {
     const url = req.url.split('?')[0];
+    if (url === '/admin/control') {
+        await serverControl.handle(req, res);
+        return;
+    }
     if (url === '/ready') {
         const ready = client.isReady();
         res.writeHead(ready ? 200 : 503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
