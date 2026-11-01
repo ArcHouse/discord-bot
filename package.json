@@ -14,7 +14,6 @@
     "discord.js": "^14.26.5",
     "dotenv": "^17.4.2",
     "https-proxy-agent": "^9.1.0",
-    "node-telegram-bot-api": "^1.2.0",
     "rss-parser": "^3.13.0",
     "socks-proxy-agent": "^10.1.0"
   }
