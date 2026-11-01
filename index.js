@@ -1,4 +1,4 @@
-const BOT_VERSION = 'v3.3.0-news-reliability';
+const BOT_VERSION = 'v3.4.0-community';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -9,6 +9,8 @@ const { getTestChannel } = require('./lib/news-test-channel');
 const { cronAuthorized, excerpt, auditGuild } = require('./lib/channel-audit');
 const { createControl } = require('./lib/server-control');
 const { createSoundCloudSync } = require('./lib/soundcloud-sync');
+const { createDurableState } = require('./lib/durable-state');
+const { createCommunity } = require('./lib/community');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -48,6 +50,18 @@ if (process.env.PROXY) {
 const client = new Client(clientOptions);
 const serverControl = createControl({ client });
 const soundcloudSync = createSoundCloudSync({ client, parser: new RSSParser({ timeout: 10000, headers: { 'User-Agent': 'ArcHouse-Music/1.0' } }) });
+let dataReady = false;
+const communityStatus = { ready: false, lastError: null };
+const savedSettings = {};
+const durableState = createDurableState({ client,
+    snapshot: () => ({ version: 1, settings: { ...savedSettings }, xp: Object.fromEntries(xpData), scores: Object.fromEntries(champScores) }),
+    restore: value => { xpData.clear(); champScores.clear(); for (const [id, data] of Object.entries(value.xp)) xpData.set(id, data); for (const [id, data] of Object.entries(value.scores)) champScores.set(id, data); Object.assign(savedSettings, value.settings); Object.assign(process.env, value.settings); }
+});
+async function setSavedSetting(key, value) {
+    if (!durableState.status.ready) throw new Error('STATE_NOT_READY');
+    savedSettings[key] = value; process.env[key] = value; durableState.changed(); await durableState.flush();
+}
+
 
 // ==================== ИГРОВЫЕ НОВОСТИ ====================
 
@@ -1060,7 +1074,7 @@ commands.set('welcome', {
         }
         if (!channel) return message.reply('❌ Укажи канал: !welcome #общее');
 
-        process.env.WELCOME_CHANNEL = channel.name;
+        await setSavedSetting('WELCOME_CHANNEL', channel.id);
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
@@ -1085,7 +1099,9 @@ commands.set('autorole', {
         const role = message.mentions.roles.first();
         if (!role) return message.reply('❌ Укажи роль: !autorole @Member');
 
-        process.env.AUTOROLE = role.id;
+        const forbidden = 2n | 4n | 8n | 16n | 32n | 8192n | 131072n | (1n << 28n) | (1n << 29n) | (1n << 40n);
+        if (role.managed || !role.editable || role.id === message.guild.id || (role.permissions.bitfield & forbidden)) return message.reply('Эту роль нельзя выдавать автоматически: у неё есть права управления или массовых упоминаний.');
+        await setSavedSetting('AUTOROLE', role.id);
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
@@ -1098,151 +1114,15 @@ commands.set('autorole', {
 
 // --- СЕРВЕР ---
 
-commands.set('setup', {
-    name: 'setup',
-    description: 'Создать красивую структуру сервера',
-    usage: '!setup',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может настроить сервер!');
-        }
-
-        const guild = message.guild;
-        const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle('⚙️ Создаю структуру сервера...')
-            .setDescription('Подожди несколько секунд...')
-            .setTimestamp();
-        const msg = await message.channel.send({ embeds: [embed] });
-
-        try {
-            // Удаляем существующие каналы (кроме текущего)
-            for (const [, channel] of guild.channels.cache) {
-                if (channel.id !== message.channel.id && channel.type !== 4) {
-                    await channel.delete().catch(() => {});
-                }
-            }
-            for (const [, channel] of guild.channels.cache) {
-                if (channel.id !== message.channel.id && channel.type === 4) {
-                    await channel.delete().catch(() => {});
-                }
-            }
-
-            // Создаём роли
-            const roleAdmin = await guild.roles.create({ name: 'Admin', color: 0xff0000, permissions: [PermissionsBitField.Flags.Administrator] }).catch(() => null);
-            const roleMod = await guild.roles.create({ name: 'Moderator', color: 0xffa500 }).catch(() => null);
-            const roleMember = await guild.roles.create({ name: 'Member', color: 0x00ff00 }).catch(() => null);
-            const roleMuted = await guild.roles.create({ name: 'Muted', color: 0x808080 }).catch(() => null);
-
-            // Создаём категории и каналы
-
-            // 📌 ИНФОРМАЦИЯ
-            const catInfo = await guild.channels.create({ name: '📌 ИНФОРМАЦИЯ', type: 4 });
-            await guild.channels.create({ name: '📜-правила', type: 0, parent: catInfo });
-            await guild.channels.create({ name: '📢-объявления', type: 0, parent: catInfo });
-            await guild.channels.create({ name: '🎫-тикеты', type: 0, parent: catInfo });
-
-            // 💬 ТЕКСТОВЫЕ КАНАЛЫ
-            const catText = await guild.channels.create({ name: '💬 ТЕКСТОВЫЕ КАНАЛЫ', type: 4 });
-            await guild.channels.create({ name: '👋-общение', type: 0, parent: catText });
-            await guild.channels.create({ name: '🎮-игры', type: 0, parent: catText });
-            await guild.channels.create({ name: '🎵-музыка', type: 0, parent: catText });
-            await guild.channels.create({ name: '🖼-мемы', type: 0, parent: catText });
-            await guild.channels.create({ name: '🤖-бот-команды', type: 0, parent: catText });
-
-            // 🔊 ГОЛОСОВЫЕ КАНАЛЫ
-            const catVoice = await guild.channels.create({ name: '🔊 ГОЛОСОВЫЕ КАНАЛЫ', type: 4 });
-            await guild.channels.create({ name: '🔊 Лобби', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '🎮 Игры', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '🎵 Музыка', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '💬 Разговоры', type: 2, parent: catVoice });
-
-            // 🛡 МОДЕРАЦИЯ
-            const catMod = await guild.channels.create({ name: '🛡 МОДЕРАЦИЯ', type: 4 });
-            await guild.channels.create({ name: '📋-логи', type: 0, parent: catMod });
-            await guild.channels.create({ name: '⚡-модерация-чат', type: 0, parent: catMod });
-
-            const successEmbed = new EmbedBuilder()
-                .setColor(0x00ff00)
-                .setTitle('✅ Сервер готов!')
-                .setDescription('Создана красивая структура:')
-                .addFields(
-                    { name: '📌 Информация', value: 'Правила, Объявления, Тикеты', inline: true },
-                    { name: '💬 Текстовые', value: 'Общение, Игры, Музыка, Мемы, Бот', inline: true },
-                    { name: '🔊 Голосовые', value: 'Лобби, Игры, Музыка, Разговоры', inline: true },
-                    { name: '🛡 Модерация', value: 'Логи, Модерация чат', inline: true },
-                    { name: '🎭 Роли', value: 'Admin, Moderator, Member, Muted', inline: true }
-                )
-                .setTimestamp();
-            msg.edit({ embeds: [successEmbed] });
-        } catch (err) {
-            console.error('❌ Ошибка setup:', err);
-            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
-        }
-    }
-});
+commands.set('setup', { name: 'setup', description: 'Устаревшая команда отключена', async execute(message) { return message.reply('Команда отключена: сервер уже настроен. Для изменений используй /настройки или обратись к владельцу.'); } });
 
 // --- ИГРОВЫЕ НОВОСТИ ---
 
-commands.set('gamenews', {
-    name: 'gamenews',
-    description: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ"',
-    usage: '!gamenews',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        const guild = message.guild;
-        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('🎮 Создаю каналы...').setTimestamp()] });
-
-        try {
-            const category = await guild.channels.create({ name: '🎮 ИГРОВЫЕ НОВОСТИ', type: 4 });
-            await new Promise(r => setTimeout(r, 1000));
-
-            const ch1 = await guild.channels.create({ name: '📰-игровые-новости', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 500));
-            const ch2 = await guild.channels.create({ name: '🎮-lol-новости', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 500));
-            const ch3 = await guild.channels.create({ name: '⚔️-lol-гайды', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 500));
-            const ch4 = await guild.channels.create({ name: '💬-lol-команды', type: 0, parent: category });
-
-            const everyone = guild.roles.everyone;
-            const owner = await guild.members.fetch(guild.ownerId).catch(() => null);
-            const adminRole = guild.roles.cache.find(r => r.name === 'Admin');
-            const modRole = guild.roles.cache.find(r => r.name === 'Moderator');
-
-            // Каналы автопостинга - никто не пишет кроме.owner и Admin
-            for (const ch of [ch1, ch2, ch3]) {
-                await ch.permissionOverwrites.edit(everyone, { SendMessages: false });
-                if (owner) await ch.permissionOverwrites.edit(owner, { SendMessages: true });
-                if (adminRole) await ch.permissionOverwrites.edit(adminRole, { SendMessages: true });
-            }
-
-            // Канал команд - пишет только.owner, Admin, Moderator
-            await ch4.permissionOverwrites.edit(everyone, { SendMessages: false });
-            if (owner) await ch4.permissionOverwrites.edit(owner, { SendMessages: true });
-            if (adminRole) await ch4.permissionOverwrites.edit(adminRole, { SendMessages: true });
-            if (modRole) await ch4.permissionOverwrites.edit(modRole, { SendMessages: true });
-
-            await new Promise(r => setTimeout(r, 2000));
-
-            // Приветствия
-            await ch1.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('Последние новости из мира игр!\n\nGTA, Cyberpunk, Call of Duty и другие.\nПеревод на русский язык.\nРасписание: 08:00, 14:00, 20:00 (NEWS_TIMEZONE, по умолчанию Москва).').setTimestamp()] });
-            await ch2.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Последние новости League of Legends!\n\nПатч-ноуты, новые чемпионы, скины.\nТурнирные новости.\nАвто-обновление.').setTimestamp()] });
-            await ch3.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ И СТАТИСТИКА').setDescription('Tier List, сборки, рейтинги!\n\nДанные: OP.GG | Патч 16.13\nАвто-обновление каждые 6-12 часов.').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
-            await ch3.send({ embeds: [createTierListEmbed()] });
-            await ch4.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь! Бот ответит.\n\n**Доступные команды:**\n`!tierlist` — Tier List\n`!top mid` — Топ чемпионов\n`!builds mid` — Сборки\n`!rating` — Рейтинг\n`!counter Ahri` — Статистика\n`!lolnews` — Новости\n`!lolhelp` — Подробная помощь').setTimestamp()] });
-
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('✅ Каналы созданы!').setDescription('📰-игровые-новости\n🎮-lol-новости\n⚔️-lol-гайды\n💬-lol-команды').setTimestamp()] });
-
-        } catch (err) {
-            console.error('❌ Ошибка gamenews:', err);
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
-        }
-    }
-});
+commands.set('gamenews', { name: 'gamenews', description: 'Показать существующий канал новостей', async execute(message) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('❌ Только админ!');
+    await message.guild.channels.fetch(); const channel = selectChannel(message.guild.channels.cache, process.env.NEWS_CHANNEL_ID);
+    return message.reply('Игровые новости: <#' + channel.id + '>. Новые каналы не создавались.');
+} });
 
 // --- ОТПРАВИТЬ ПРИВЕТСТВИЯ ---
 
@@ -1548,47 +1428,7 @@ commands.set('verify', {
 
 // --- ПРАВИЛА ---
 
-commands.set('rules', {
-    name: 'rules',
-    description: 'Опубликовать правила сервера',
-    usage: '!rules',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может публиковать правила!');
-        }
-
-        const rulesChannel = message.guild.channels.cache.find(ch => ch.name === '📜-правила');
-        if (!rulesChannel) return message.reply('❌ Канал #📜-правила не найден!');
-
-        const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle('📜 ПРАВИЛА СЕРВЕРА')
-            .setDescription('Добро пожаловать на **Сервер ZOHAN**! Пожалуйста, ознакомьтесь с правилами перед использованием сервера.')
-            .addFields(
-                { name: '1️⃣ Уважение', value: 'Уважайте других участников. Запрещены оскорбления, дискриминация, расизм и любые формы харассмента.' },
-                { name: '2️⃣ Спам и реклама', value: 'Запрещён спам, массовые сообщения, реклама других серверов, ботов и товаров без разрешения администратора.' },
-                { name: '3️⃣ Ссылки', value: 'Запрещены сторонние ссылки в чатах. Исключение — ссылки в #🎮-игры с разрешения модератора.' },
-                { name: '4️⃣ Голосовые каналы', value: 'Запрещён крик, микрофон-спам, звуковые эффекты без согласия участников. Уважайте чужое пространство.' },
-                { name: '5️⃣ NSFW контент', value: 'Запрещён порнографический, жестокий и любой 18+ контент. За нарушение — бан.' },
-                { name: '6️⃣ Личные данные', value: 'Запрещено публиковать личные данные других людей (адреса, телефоны, фото) без их согласия.' },
-                { name: '7️⃣ Мультиаккаунты', value: 'Запрещено использование нескольких аккаунтов для обхода бана или мута.' },
-                { name: '8️⃣ Админы', value: 'Следуйте инструкциям модераторов и администраторов. Их решения окончательны.' },
-                { name: '9️⃣ Музыка', value: 'Используйте бота музыки только в голосовых каналах. Не злоупотребляйте командами.' },
-                { name: '🔟 Здравый смысл', value: 'Если действие может навредить серверу или участникам — не делайте его.' }
-            )
-            .setFooter({ text: 'Нарушение правил ведёт к муту, кику или бану. Приятного общения! 🎮' })
-            .setTimestamp();
-
-        await rulesChannel.send({ embeds: [embed] });
-
-        const successEmbed = new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle('✅ Правила опубликованы!')
-            .setDescription(`Правила отправлены в ${rulesChannel}`)
-            .setTimestamp();
-        message.channel.send({ embeds: [successEmbed] });
-    }
-});
+commands.set('rules', { name: 'rules', description: 'Правила сервера', async execute(message) { await message.reply('Правила: https://discord.com/channels/1269021960042446860/1526414882231156878/1526420949828767757'); } });
 
 // --- КОМАНДЫ ДЛЯ ВСЕХ ---
 
@@ -1732,71 +1572,15 @@ commands.set('lockmod', {
 
 // --- УДАЛИТЬ ТИКЕТЫ ---
 
-commands.set('deltickets', {
-    name: 'deltickets',
-    description: 'Удалить канал тикетов',
-    usage: '!deltickets',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может!');
-        }
-
-        const channel = message.guild.channels.cache.find(ch => ch.name === '🎫-тикеты');
-        if (!channel) return message.reply('❌ Канал тикетов не найден!');
-
-        await channel.delete().catch(() => {});
-        message.reply('✅ Канал тикетов удалён!');
-    }
-});
+commands.set('deltickets', { name: 'deltickets', description: 'Устаревшая команда отключена', async execute(message) { return message.reply('Команда отключена: сервер уже настроен. Для изменений используй /настройки или обратись к владельцу.'); } });
 
 // --- УДАЛИТЬ LOL КОМАНДЫ ---
 
-commands.set('dellolcommands', {
-    name: 'dellolcommands',
-    description: 'Удалить канал lol-команды',
-    usage: '!dellolcommands',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        const channel = message.guild.channels.cache.find(ch => ch.name.includes('lol-komandy') || ch.name.includes('lol-команды'));
-        if (!channel) return message.reply('❌ Канал не найден!');
-
-        await channel.delete().catch(() => {});
-        message.reply('✅ Канал удалён!');
-    }
-});
+commands.set('dellolcommands', { name: 'dellolcommands', description: 'Устаревшая команда отключена', async execute(message) { return message.reply('Команда отключена: сервер уже настроен. Для изменений используй /настройки или обратись к владельцу.'); } });
 
 // --- УДАЛИТЬ LOL КАНАЛЫ (новости + гайды) ---
 
-commands.set('deletelolchannels', {
-    name: 'deletelolchannels',
-    description: 'Удалить каналы lol-новости и lol-гайды',
-    usage: '!deletelolchannels',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        const deleted = [];
-        const channelNames = ['lol-новости', 'lol-novosti', 'lol-гайды', 'lol-gajdy', '⚔️-lol-гайды', '🎮-lol-новости'];
-
-        for (const name of channelNames) {
-            const ch = message.guild.channels.cache.find(c => c.name.includes(name));
-            if (ch) {
-                await ch.delete().catch(() => {});
-                deleted.push(ch.name);
-            }
-        }
-
-        if (deleted.length === 0) {
-            return message.reply('❌ Каналы lol не найдены!');
-        }
-
-        message.reply(`✅ Удалены каналы: ${deleted.join(', ')}`);
-    }
-});
+commands.set('deletelolchannels', { name: 'deletelolchannels', description: 'Устаревшая команда отключена', async execute(message) { return message.reply('Команда отключена: сервер уже настроен. Для изменений используй /настройки или обратись к владельцу.'); } });
 
 // --- ОЧИСТИТЬ КАНАЛ НОВОСТЕЙ ---
 
@@ -1989,10 +1773,17 @@ commands.set('poll', {
 
 // ==================== СОБЫТИЯ ====================
 
-client.once('clientReady', () => {
+client.once('clientReady', async () => {
     console.log(`✅ Бот ${client.user.tag} запущен! Version: ${BOT_VERSION}`);
     client.user.setActivity('!help | Сервер ZOHAN', { type: ActivityType.Playing });
 
+    for (const key of ['WELCOME_CHANNEL', 'AUTOROLE']) if (process.env[key]) savedSettings[key] = process.env[key];
+    await durableState.load();
+    dataReady = durableState.status.ready;
+    if (dataReady) setInterval(() => durableState.flush().catch(() => {}), 30000);
+    const community = createCommunity({ client, state: durableState, news: newsPublisher.status, music: soundcloudSync.status, setSetting: setSavedSetting });
+    client.on('interactionCreate', interaction => community.handle(interaction).catch(error => console.error('[community] interaction failed code=' + error.name)));
+    community.install().then(() => { communityStatus.ready = true; }).catch(error => { communityStatus.lastError = String(error.code || error.name); console.error('[community] install failed code=' + communityStatus.lastError); });
     if (soundcloudSync.status.enabled) {
         soundcloudSync.tick();
         setInterval(() => soundcloudSync.tick(), 5 * 60 * 1000);
@@ -2036,7 +1827,7 @@ client.on('messageCreate', async (message) => {
 
 // Приветствие новых участников
 client.on('guildMemberAdd', async (member) => {
-    const channel = member.guild.channels.cache.find(ch => ch.name === process.env.WELCOME_CHANNEL);
+    const channel = member.guild.channels.cache.get(process.env.WELCOME_CHANNEL) || member.guild.channels.cache.find(ch => ch.name === process.env.WELCOME_CHANNEL);
     if (channel) {
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
@@ -2195,7 +1986,7 @@ client.on('messageCreate', async (message) => {
     }
 
     // Анти-ссылки (разрешены в каналах: игры, музыка, бот-команды)
-    const allowedChannels = ['🎮-игры', '🎵-музыка', '👋-общение', 'общее'];
+    const allowedChannels = ['🎮-игры', '🎵-музыка', '👋-общение', 'общее', '🤖-бот-команды', '💬-обсуждение'];
     const urlRegex = /https?:\/\/[^\s]+|www\.[^\s]+/i;
     if (urlRegex.test(message.content) && !allowedChannels.includes(message.channel.name)) {
         try {
@@ -2275,7 +2066,7 @@ const server = http.createServer(async (req, res) => {
     if (url === '/ready') {
         const ready = client.isReady();
         res.writeHead(ready ? 200 : 503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-        res.end(JSON.stringify({ ready, productionEnabled: process.env.NEWS_PRODUCTION_ENABLED !== 'false', news: newsPublisher.status, soundcloud: soundcloudSync.status }));
+        res.end(JSON.stringify({ ready, productionEnabled: process.env.NEWS_PRODUCTION_ENABLED !== 'false', news: newsPublisher.status, soundcloud: soundcloudSync.status, storage: durableState.status, community: communityStatus }));
         return;
     }
 
@@ -2358,12 +2149,7 @@ function loadScores() {
         }
     } catch (e) {}
 }
-function saveScores() {
-    try {
-        const data = Object.fromEntries(champScores);
-        fs.writeFileSync(SCORES_FILE, JSON.stringify(data, null, 2), 'utf8');
-    } catch (e) {}
-}
+function saveScores() { durableState.changed(); }
 loadScores();
 
 commands.set('champ', {
@@ -2371,6 +2157,7 @@ commands.set('champ', {
     description: 'Мини-игра: Угадай чемпиона по картинке!',
     usage: '!champ',
     async execute(message) {
+        if (!dataReady) return message.reply('Сохранение данных пока недоступно. Проверь /статус.');
         if (activeGames.has(message.channel.id)) {
             return message.reply('⚠️ Уже идёт игра! Дождитесь окончания.');
         }
@@ -2499,12 +2286,7 @@ function loadXP() {
         }
     } catch (e) {}
 }
-function saveXP() {
-    try {
-        const data = Object.fromEntries(xpData);
-        fs.writeFileSync(XP_FILE, JSON.stringify(data, null, 2), 'utf8');
-    } catch (e) {}
-}
+function saveXP() { durableState.changed(); }
 loadXP();
 
 // XP за сообщение (5-15 рандомно)
@@ -2534,9 +2316,14 @@ function getRankEmoji(level) {
     return '⭐';
 }
 
+const xpCooldown = new Map();
 // Начисление XP за сообщение
 client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.guild || !message.member) return;
+    if (!dataReady || message.author.bot || !message.guild || !message.member || message.guild.id !== process.env.SERVER_CONTROL_GUILD_ID) return;
+    if (message.content.startsWith(process.env.PREFIX || '!')) return;
+    const previous = xpCooldown.get(message.author.id) || 0;
+    if (Date.now() - previous < 60000) return;
+    xpCooldown.set(message.author.id, Date.now());
 
     const userId = message.author.id;
     if (!xpData.has(userId)) xpData.set(userId, { xp: 0, messages: 0, lastLevel: 1 });
@@ -2643,7 +2430,16 @@ commands.set('rank', {
 });
 
 // Discord message history is the durable news record.
-process.on('SIGTERM', () => { process.exit(0); });
-process.on('SIGINT', () => { process.exit(0); });
+let shuttingDown = false;
+async function shutdown() {
+    if (shuttingDown) return;
+    shuttingDown = true; dataReady = false;
+    const deadline = setTimeout(() => process.exit(1), 20000);
+    try { if (durableState.status.ready) await durableState.flush(); }
+    catch { console.error('[state] final save failed; inspect last saved snapshot'); }
+    clearTimeout(deadline); client.destroy(); server.close(); process.exit(0);
+}
+process.once('SIGTERM', shutdown);
+process.once('SIGINT', shutdown);
 
 client.login(process.env.TOKEN);
