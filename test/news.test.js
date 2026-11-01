@@ -120,6 +120,45 @@ test('failed scheduled run retries within the same slot', async () => {
 });
 
 const flags = { ViewChannel: 1n, SendMessages: 2n, EmbedLinks: 4n, ReadMessageHistory: 8n };
+
+test('413 rejected batch is divided; repeat run does not resend accepted cards', async () => {
+    const ch = channel(); const send = ch.send.bind(ch); let rejected = 0;
+    ch.send = async payload => {
+        if (payload.embeds.length > 2) { rejected++; throw Object.assign(new Error('large'), { code: 40005, status: 413 }); }
+        return send(payload);
+    };
+    const p = publisher(Array.from({ length: 6 }, (_, i) => article(String(i))));
+    assert.equal((await p.publish(ch)).sent, 6); assert.ok(rejected > 0);
+    assert.equal(ch.payloads.flatMap(p => p.embeds).length, 6);
+    assert.equal((await p.publish(ch)).sent, 0);
+});
+
+test('single oversized card retries without image, then stops if still rejected', async () => {
+    const ch = channel(); const send = ch.send.bind(ch);
+    ch.send = async payload => {
+        if (payload.embeds[0].image) throw Object.assign(new Error('large'), { code: 40005 });
+        return send(payload);
+    };
+    const p = publisher([article()], { buildEmbed: async item => ({ title: item.title, url: item.link, image: { url: 'https://example.com/image' } }) });
+    assert.equal((await p.publish(ch)).sent, 1);
+    assert.equal(ch.payloads[0].embeds[0].image, undefined);
+    const broken = channel(); let attempts = 0;
+    broken.send = async () => { attempts++; throw Object.assign(new Error('large'), { status: 413 }); };
+    await assert.rejects(publisher().publish(broken)); assert.equal(attempts, 1);
+});
+
+test('partial delivery survives a later send failure without duplicates on retry', async () => {
+    const ch = channel(); const send = ch.send.bind(ch); let failSecond = true;
+    ch.send = async payload => {
+        if (payload.embeds.length > 1) throw Object.assign(new Error('large'), { status: 413 });
+        if (payload.embeds[0].title === 'two' && failSecond) throw Error('network');
+        return send(payload);
+    };
+    const p = publisher([article('one'), article('two')]);
+    await assert.rejects(p.publish(ch)); failSecond = false;
+    assert.equal((await p.publish(ch)).sent, 1);
+    assert.deepEqual(ch.payloads.flatMap(p => p.embeds.map(e => e.title)), ['one', 'two']);
+});
 function permissions(bits) { return { has(value) { return (Array.isArray(value) ? value : [value]).every(bit => (bits & bit) === bit); } }; }
 function privateChannel() {
     return { id: 'sandbox', type: 0, name: '🚩мой-для-тестов',
