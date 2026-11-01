@@ -1409,8 +1409,11 @@ commands.set('verify', {
             verifiedRole = await message.guild.roles.create({
                 name: 'Verified',
                 color: 0x00ff00,
+                permissions: 0n,
             }).catch(() => null);
         }
+
+        if (!verifiedRole || verifiedRole.managed || !verifiedRole.editable || verifiedRole.permissions.bitfield !== 0n) return message.reply('Для безопасной верификации нужна редактируемая роль Verified без дополнительных прав.');
 
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
