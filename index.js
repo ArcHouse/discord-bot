@@ -1860,95 +1860,31 @@ commands.set('deletelolchannels', {
 
 commands.set('clearnews', {
     name: 'clearnews',
-    description: 'Очистить канал от новостей (игровые новости)',
+    description: 'Очистить до 100 старых сообщений этого бота; последние 72 часа сохраняются',
     usage: '!clearnews',
     async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        const newsChannel = message.guild.channels.cache.find(ch =>
-            ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')
-        );
-
-        if (!newsChannel) return message.reply('❌ Канал новостей не найден!');
-
-        try {
-            let deleted = 0;
-            let fetched;
-            do {
-                fetched = await newsChannel.messages.fetch({ limit: 100 });
-                const botMessages = fetched.filter(m => m.author.bot);
-                if (botMessages.size === 0) break;
-                await newsChannel.bulkDelete(botMessages).catch(() => {});
-                deleted += botMessages.size;
-                await new Promise(r => setTimeout(r, 1000));
-            } while (fetched.size >= 100);
-
-            message.reply(`✅ Удалено ${deleted} сообщений бота из канала ${newsChannel}`);
-        } catch (err) {
-            message.reply('❌ Ошибка при очистке: ' + err.message);
-        }
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('❌ Только админ!');
+        await message.guild.channels.fetch();
+        const channel = selectChannel(message.guild.channels.cache, process.env.NEWS_CHANNEL_ID);
+        const recent = await channel.messages.fetch({ limit: 100 });
+        const now = Date.now();
+        const eligible = recent.filter(m => m.author.id === message.client.user.id &&
+            now - m.createdTimestamp > 72 * 60 * 60 * 1000 && now - m.createdTimestamp < 14 * 24 * 60 * 60 * 1000 - 60000);
+        if (!eligible.size) return message.reply('Подходящих старых сообщений среди последних 100 нет. Последние 72 часа сохраняются для защиты от повторов.');
+        const deleted = await channel.bulkDelete(eligible, true);
+        await message.reply('✅ Удалено сообщений этого бота: ' + deleted.size + '. Последние 72 часа сохранены.');
     }
 });
 
-// --- ПЕРЕСОЗДАТЬ КАНАЛ НОВОСТЕЙ ---
-
 commands.set('setupnews', {
     name: 'setupnews',
-    description: 'Удалить и заново создать канал игровых новостей',
+    description: 'Проверить существующий канал новостей без удаления и повторной рассылки',
     usage: '!setupnews',
     async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        // Удаляем старый канал
-        const oldChannel = message.guild.channels.cache.find(ch =>
-            ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')
-        );
-        if (oldChannel) {
-            await oldChannel.delete().catch(() => {});
-            await new Promise(r => setTimeout(r, 1000));
-        }
-
-        // Ищем категорию ИГРОВЫЕ НОВОСТИ
-        let category = message.guild.channels.cache.find(ch => ch.name.includes('ИГРОВЫЕ НОВОСТИ') && ch.type === ChannelType.GuildCategory);
-        if (!category) {
-            category = await message.guild.channels.create({
-                name: '🎮 ИГРОВЫЕ НОВОСТИ',
-                type: ChannelType.GuildCategory,
-            }).catch(() => null);
-        }
-
-        // Создаём новый канал
-        const newChannel = await message.guild.channels.create({
-            name: '🎮-игровые-новости',
-            type: ChannelType.GuildText,
-            parent: category?.id || undefined,
-        }).catch(() => null);
-
-        if (!newChannel) return message.reply('❌ Не удалось создать канал!');
-
-        // Делаем канал read-only для @everyone
-        await newChannel.permissionOverwrites.edit(message.guild.roles.everyone, {
-            SendMessages: false,
-            ViewChannel: true,
-        }).catch(() => {});
-
-        // Приветственное сообщение
-        const embed = new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle('🎮 Игровые новости')
-            .setDescription('Сюда бот будет автоматически постить игровые новости на русском языке с картинками.\n\n📰 Расписание: 08:00, 14:00, 20:00 (NEWS_TIMEZONE, по умолчанию Москва). На спящем сервере возможна задержка.')
-            .setTimestamp();
-
-        await newChannel.send({ embeds: [embed] });
-
-        // Триггерим первый пост новостей
-        await postNewsToChannel(message.client);
-
-        message.reply(`✅ Канал ${newChannel} создан! Первая порция новостей отправлена.`);
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('❌ Только админ!');
+        await message.guild.channels.fetch();
+        const channel = selectChannel(message.guild.channels.cache, process.env.NEWS_CHANNEL_ID);
+        await message.reply('✅ Выбран канал <#' + channel.id + '>. Каналы и история сохранены. Для проверки прав используй !serveraudit.');
     }
 });
 
@@ -2111,7 +2047,7 @@ commands.set('poll', {
 
 // ==================== СОБЫТИЯ ====================
 
-client.on('ready', () => {
+client.once('clientReady', () => {
     console.log(`✅ Бот ${client.user.tag} запущен! Version: ${BOT_VERSION}`);
     client.user.setActivity('!help | Сервер ZOHAN', { type: ActivityType.Playing });
 
@@ -2122,7 +2058,7 @@ client.on('ready', () => {
 
         // Обработка сообщений из Telegram → Discord
         telegramBot.on('message', async (msg) => {
-            if (msg.from.is_bot) return;
+            if (!msg.from || msg.from.is_bot || String(msg.chat?.id) !== String(TELEGRAM_CHAT_ID) || typeof msg.text !== 'string') return;
 
             // Ищем канал для Telegram сообщений
             for (const [, guild] of client.guilds.cache) {
@@ -2163,10 +2099,11 @@ client.on('ready', () => {
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(process.env.PREFIX)) return;
+    if (message.author.bot || !message.guild || !message.member) return;
+    const prefix = process.env.PREFIX || '!';
+    if (!message.content.startsWith(prefix)) return;
 
-    const args = message.content.slice(process.env.PREFIX.length).trim().split(/ +/);
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
 
     const command = commands.get(commandName);
@@ -2175,8 +2112,8 @@ client.on('messageCreate', async (message) => {
     try {
         await command.execute(message, args);
     } catch (error) {
-        console.error(error);
-        message.reply('❌ Произошла ошибка при выполнении команды!');
+        console.error('[command] failed code=' + (error.code || error.name));
+        await message.reply('❌ Произошла ошибка при выполнении команды!').catch(() => {});
     }
 });
 
@@ -2228,7 +2165,7 @@ client.on('guildMemberRemove', async (member) => {
 
 // ЛОГИРОВАНИЕ: удалённые сообщения
 client.on('messageDelete', async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild || !message.member) return;
     const logChannel = message.guild.channels.cache.find(ch => ch.name === '📋-логи');
     if (!logChannel) return;
 
@@ -2297,7 +2234,7 @@ client.on('guildBanRemove', async (ban) => {
 
 // АНТИ-СПАМ и АНТИ-ССЫЛКИ
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild || !message.member) return;
     if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
 
     const userId = message.author.id;
@@ -2584,7 +2521,7 @@ commands.set('champscores', {
 
 // Обработка ответов в мини-игре
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild || !message.member) return;
     if (!message.content.startsWith(process.env.PREFIX || '!')) return;
 
     const game = activeGames.get(message.channel.id);
@@ -2678,7 +2615,7 @@ function getRankEmoji(level) {
 
 // Начисление XP за сообщение
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild || !message.member) return;
 
     const userId = message.author.id;
     if (!xpData.has(userId)) xpData.set(userId, { xp: 0, messages: 0, lastLevel: 1 });
