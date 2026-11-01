@@ -1,0 +1,9 @@
+.git
+.local
+node_modules
+.env
+.env.*
+control-key.txt
+server-control.json
+*.key
+*.p12

@@ -1,10 +1,16 @@
-const BOT_VERSION = 'v3.2.0-fixed-http';
+const BOT_VERSION = 'v3.4.0-community';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ActivityType, ChannelType } = require('discord.js');
 const RSSParser = require('rss-parser');
-const TelegramBot = require('node-telegram-bot-api');
+const { createPublisher, selectChannel, createScheduler, httpUrl } = require('./lib/news');
+const { getTestChannel } = require('./lib/news-test-channel');
+const { cronAuthorized, excerpt, auditGuild } = require('./lib/channel-audit');
+const { createControl } = require('./lib/server-control');
+const { createSoundCloudSync } = require('./lib/soundcloud-sync');
+const { createDurableState } = require('./lib/durable-state');
+const { createCommunity } = require('./lib/community');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -38,52 +44,30 @@ if (process.env.PROXY) {
         proxyAgent = new HttpsProxyAgent(process.env.PROXY);
     }
     clientOptions.rest = { agent: proxyAgent };
-    console.log(`🔗 Используется прокси: ${process.env.PROXY}`);
+    console.log('🔗 Прокси настроен');
 }
 
 const client = new Client(clientOptions);
-
-// ==================== TELEGRAM BOT ====================
-
-// Telegram бот для связи Discord ↔ Telegram
-let telegramBot = null;
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-
-// Функция отправки сообщения в Telegram
-async function sendToTelegram(message, fromDiscord = true) {
-    if (!telegramBot || !TELEGRAM_CHAT_ID) return;
-
-    try {
-        const prefix = fromDiscord ? '💬 Discord: ' : '';
-        await telegramBot.sendMessage(TELEGRAM_CHAT_ID, prefix + message);
-    } catch (err) {
-        console.log('⚠️ Telegram ошибка:', err.message);
-    }
+const serverControl = createControl({ client });
+const soundcloudSync = createSoundCloudSync({ client, parser: new RSSParser({ timeout: 10000, headers: { 'User-Agent': 'ArcHouse-Music/1.0' } }) });
+let dataReady = false;
+const communityStatus = { ready: false, lastError: null };
+const savedSettings = {};
+const durableState = createDurableState({ client,
+    snapshot: () => ({ version: 1, settings: { ...savedSettings }, xp: Object.fromEntries(xpData), scores: Object.fromEntries(champScores) }),
+    restore: value => { xpData.clear(); champScores.clear(); for (const [id, data] of Object.entries(value.xp)) xpData.set(id, data); for (const [id, data] of Object.entries(value.scores)) champScores.set(id, data); Object.assign(savedSettings, value.settings); Object.assign(process.env, value.settings); }
+});
+async function setSavedSetting(key, value) {
+    if (!durableState.status.ready) throw new Error('STATE_NOT_READY');
+    savedSettings[key] = value; process.env[key] = value; durableState.changed(); await durableState.flush();
 }
 
-// Функция отправки embed в Telegram
-async function sendEmbedToTelegram(embed, fromDiscord = true) {
-    if (!telegramBot || !TELEGRAM_CHAT_ID) return;
-
-    try {
-        const prefix = fromDiscord ? '💬 Discord:\n' : '';
-        let text = prefix + embed.title + '\n\n';
-        if (embed.description) text += embed.description + '\n';
-        if (embed.fields) {
-            embed.fields.forEach(f => {
-                text += `\n${f.name}: ${f.value}`;
-            });
-        }
-        await telegramBot.sendMessage(TELEGRAM_CHAT_ID, text.substring(0, 4000));
-    } catch (err) {
-        console.log('⚠️ Telegram embed ошибка:', err.message);
-    }
-}
 
 // ==================== ИГРОВЫЕ НОВОСТИ ====================
 
 const rssParser = new RSSParser();
+// Separate parser keeps the existing LoL path unchanged.
+const gameRssParser = new RSSParser({ timeout: 10000, headers: { 'User-Agent': 'Zohan-News/3.3' } });
 
 // RSS-ленты игровых новостей (только рабочие!)
 const RSS_FEEDS = [
@@ -172,20 +156,20 @@ async function checkTwitchStreams(client) {
         try {
             // Используем публичный API для проверки статуса
             const url = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${channel.login}-320x180.jpg`;
-            
+
             // Проверяем через fetch
             const response = await fetch(url, { method: 'HEAD' });
             const isLive = response.ok;
-            
+
             const wasLive = streamStatus.get(channel.login) || false;
-            
+
             // Если стрим начался
             if (isLive && !wasLive) {
                 console.log(`🔴 ${channel.name} начал стрим!`);
-                
+
                 // Ищем канал объявления
                 for (const [, guild] of client.guilds.cache) {
-                    const announceChannel = guild.channels.cache.find(ch => 
+                    const announceChannel = guild.channels.cache.find(ch =>
                         ch.name.includes('объявления') || ch.name.includes('announce')
                     );
                     if (announceChannel) {
@@ -204,50 +188,21 @@ async function checkTwitchStreams(client) {
                     }
                 }
             }
-            
+
             // Если стрим закончился
             if (!isLive && wasLive) {
                 console.log(`⚫ ${channel.name} закончил стрим`);
             }
-            
+
             streamStatus.set(channel.login, isLive);
-            
+
         } catch (err) {
             console.log('⚠️ Twitch ошибка:', err.message.substring(0, 50));
         }
     }
 }
 
-// Хранилище опубликованных новостей (чтобы не дублировать) — сохраняется в файл
-const NEWS_FILE = path.join(__dirname, 'published-news.json');
-const publishedNews = new Set();
-
-// Загрузка опубликованных новостей из файла
-function loadPublishedNews() {
-    try {
-        if (fs.existsSync(NEWS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(NEWS_FILE, 'utf8'));
-            data.forEach(url => publishedNews.add(url));
-            console.log(`📰 Загружено ${publishedNews.size} опубликованных новостей`);
-        }
-    } catch (e) {}
-}
-
-// Сохранение в файл (не чаще раза в 5 минут)
-let lastNewsSave = 0;
-function savePublishedNews() {
-    const now = Date.now();
-    if (now - lastNewsSave < 5 * 60 * 1000) return;
-    lastNewsSave = now;
-    try {
-        // Храним только последние 500 записей чтобы файл не рос бесконечно
-        const arr = Array.from(publishedNews);
-        const trimmed = arr.slice(-500);
-        fs.writeFileSync(NEWS_FILE, JSON.stringify(trimmed), 'utf8');
-    } catch (e) {}
-}
-
-loadPublishedNews();
+// Production deduplication is recovered from Discord history, per channel.
 const publishedLoLNews = new Set();
 
 // ==================== LOL ДАННЫЕ (OP.GG УРОВЕНЬ) ====================
@@ -513,10 +468,11 @@ function createRatingEmbed() {
 // Функция получения новостей
 async function fetchGameNews() {
     const allNews = [];
+    let successfulFeeds = 0;
 
-    for (const feed of RSS_FEEDS) {
+    await Promise.all(RSS_FEEDS.map(async feed => {
         try {
-            const data = await rssParser.parseURL(feed.url);
+            const data = await gameRssParser.parseURL(feed.url);
             const items = data.items.slice(0, 5).map(item => {
                 // Извлекаем картинку из новости
                 let image = null;
@@ -547,11 +503,14 @@ async function fetchGameNews() {
                 };
             });
             allNews.push(...items);
+            successfulFeeds++;
         } catch (err) {
-            console.error(`❌ Ошибка RSS ${feed.name}:`, err.message);
+            console.error(`[news] RSS failed source=${feed.name} code=${err.code || err.name}`);
         }
-    }
+    }));
 
+    if (!successfulFeeds) throw Object.assign(new Error('All gaming RSS feeds failed'), { code: 'NEWS_RSS_ALL_FAILED' });
+    console.log(`[news] RSS sources=${successfulFeeds}/${RSS_FEEDS.length} items=${allNews.length}`);
     // Сортируем по дате (новые сверху)
     allNews.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -616,78 +575,54 @@ async function fetchLoLNews() {
     return topNews;
 }
 
-// Функция публикации новости в канал (ОДНО сообщение = ОДНО уведомление)
-async function postNewsToChannel(client) {
-    try {
-        for (const [, guild] of client.guilds.cache) {
-            const newsChannel = guild.channels.cache.find(ch =>
-                (ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')) &&
-                !ch.name.includes('lol')
-            );
-            if (!newsChannel) {
-                console.log('⚠️ Канал новостей не найден:', guild.name);
-                continue;
-            }
-
-            console.log(`📰 Проверяю новости для ${guild.name}...`);
-            const news = await fetchGameNews();
-            console.log(`📰 Получено ${news.length} новостей`);
-
-            if (news.length === 0) {
-                console.log('⚠️ Нет новостей');
-                continue;
-            }
-
-            const MAX_POSTS = 10;
-            const embeds = [];
-
-            for (const item of news) {
-                if (embeds.length >= MAX_POSTS) break;
-
-                // Дедупликация по ссылке
-                if (item.link && publishedNews.has(item.link)) continue;
-                // Дедупликация по заголовку
-                const titleKey = item.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
-                if (publishedNews.has('title:' + titleKey)) continue;
-
-                // Переводим на русский
-                const translatedTitle = await translateToRussian(item.title);
-                const translatedContent = await translateToRussian(item.content);
-
-                const embed = new EmbedBuilder()
-                    .setColor(getColorBySource(item.source))
-                    .setTitle(`${item.emoji} ${translatedTitle}`)
-                    .setDescription(translatedContent.substring(0, 500) + (translatedContent.length > 500 ? '...' : ''))
-                    .addFields(
-                        { name: '📰 Источник', value: item.source, inline: true },
-                        { name: '🕐 Дата', value: formatDate(item.date), inline: true }
-                    )
-                    .setURL(item.link);
-
-                if (item.image) {
-                    try { embed.setImage(item.image); } catch (err) {}
-                }
-
-                embeds.push(embed);
-
-                // Сохраняем для дедупликации
-                if (item.link) publishedNews.add(item.link);
-                publishedNews.add('title:' + titleKey);
-            }
-
-            // Отправляем ВСЕ новости ОДНИМ сообщением (1 уведомление)
-            if (embeds.length > 0) {
-                await newsChannel.send({ embeds, flags: 4096 }).catch(err => {
-                    console.error('❌ Ошибка отправки:', err.message);
-                });
-            }
-
-            savePublishedNews();
-            console.log(`✅ Опубликовано ${embeds.length} новых новостей (1 сообщение)`);
-        }
-    } catch (err) {
-        console.error('❌ Ошибка публикации новостей:', err);
+// All triggers share per-channel locks and Discord-backed deduplication.
+function makeNewsPublisher() { return createPublisher({
+    botId: () => client.user.id,
+    fetchNews: fetchGameNews,
+    async buildEmbed(item) {
+        const [title, content] = await Promise.all([translateToRussian(item.title), translateToRussian(item.content)]);
+        const embed = new EmbedBuilder()
+            .setColor(getColorBySource(item.source))
+            .setTitle(excerpt(item.emoji + ' ' + (title || item.title), 256))
+            .setDescription(excerpt(content || 'Подробнее по ссылке', 500))
+            .addFields(
+                { name: '📰 Источник', value: item.source, inline: true },
+                { name: '🕐 Дата статьи', value: formatDate(item.date), inline: true }
+            ).setURL(item.link);
+        if (httpUrl(item.image)) embed.setImage(httpUrl(item.image));
+        return embed.toJSON();
     }
+}); }
+const newsPublisher = makeNewsPublisher();
+const testNewsPublisher = makeNewsPublisher();
+
+async function postNewsToChannel(client) {
+    if (process.env.NEWS_PRODUCTION_ENABLED === 'false') throw new Error('Production news disabled for testing');
+    if (!client.isReady()) throw new Error('Discord is not ready');
+    const failures = [];
+    for (const [, guild] of client.guilds.cache) {
+        let selected = false;
+        try {
+            await guild.channels.fetch();
+            // Explicit ID scopes production delivery to that channel's server.
+            if (process.env.NEWS_CHANNEL_ID && !guild.channels.cache.has(process.env.NEWS_CHANNEL_ID)) continue;
+            const channel = selectChannel(guild.channels.cache, process.env.NEWS_CHANNEL_ID);
+            selected = true;
+            await newsPublisher.publish(channel);
+        } catch (err) {
+            if (!selected) {
+                newsPublisher.status.lastAttempt = new Date().toISOString();
+                newsPublisher.status.lastResult = 'failed';
+                newsPublisher.status.failures++;
+            }
+            console.error('[news] guild=' + guild.id + ' failed: ' + (err.code || err.name));
+            failures.push(err);
+        }
+    }
+    if (process.env.NEWS_CHANNEL_ID && ![...client.guilds.cache.values()].some(g => g.channels.cache.has(process.env.NEWS_CHANNEL_ID))) {
+        throw new Error('NEWS_CHANNEL_ID was not found in any accessible server');
+    }
+    if (failures.length) throw new AggregateError(failures, 'News delivery failed in ' + failures.length + ' server(s)');
 }
 
 // Цвета по источникам
@@ -711,7 +646,8 @@ function formatDate(dateStr) {
             month: '2-digit',
             year: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: process.env.NEWS_TIMEZONE || 'Europe/Moscow'
         });
     } catch {
         return 'Недавно';
@@ -741,12 +677,11 @@ async function translateToRussian(text) {
     const DEEPL_KEY = process.env.DEEPL_API_KEY;
     if (DEEPL_KEY) {
         try {
-            const encodedText = encodeURIComponent(cleaned.substring(0, 1000));
             const fetchOptions = { signal: AbortSignal.timeout(8000) };
             if (proxyAgent) fetchOptions.agent = proxyAgent;
             const response = await fetch(
-                `https://api-free.deepl.com/v2/translate?auth_key=${DEEPL_KEY}&text=${encodedText}&source_lang=EN&target_lang=RU`,
-                fetchOptions
+                'https://api-free.deepl.com/v2/translate',
+                { ...fetchOptions, method: 'POST', headers: { Authorization: 'DeepL-Auth-Key ' + DEEPL_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ text: [cleaned.substring(0, 1000)], source_lang: 'EN', target_lang: 'RU' }) }
             );
             if (response.ok) {
                 const data = await response.json();
@@ -757,7 +692,7 @@ async function translateToRussian(text) {
                 console.log(`⚠️ DeepL ошибка HTTP ${response.status}`);
             }
         } catch (e) {
-            console.log('⚠️ DeepL ошибка:', e.message);
+            console.log('⚠️ DeepL ошибка:', e.code || e.name);
         }
     }
 
@@ -778,7 +713,7 @@ async function translateToRussian(text) {
             }
         }
     } catch (e) {
-        console.log('⚠️ Google Translate ошибка:', e.message);
+        console.log('⚠️ Google Translate ошибка:', e.code || e.name);
     }
 
     return cleaned;
@@ -787,6 +722,47 @@ async function translateToRussian(text) {
 // ==================== КОМАНДЫ ====================
 
 const commands = new Map();
+
+commands.set('newstest', {
+    name: 'newstest',
+    description: 'Закрытый тест рассылки (только владелец)',
+    async execute(message) {
+        if (!message.guild || message.author.id !== message.guild.ownerId) return;
+        try {
+            const channel = await getTestChannel(message.guild, message.author.id, client.user.id, PermissionsBitField.Flags);
+            await testNewsPublisher.publish(channel);
+            await message.reply('✅ Тест проверен в <#' + channel.id + '>. История основной рассылки не затронута. Администраторы Discord могут видеть закрытые каналы.');
+        } catch (err) {
+            console.error('[news-test] failed code=' + (err.code || err.name));
+            await message.reply('❌ Тест не выполнен. Проверьте права тестового канала и журнал Render. Основная рассылка не запускалась.');
+        }
+    }
+});
+
+commands.set('serveraudit', {
+    name: 'serveraudit',
+    description: 'Проверка каналов и прав (только владелец, без изменений)',
+    async execute(message) {
+        if (!message.guild || message.author.id !== message.guild.ownerId) return;
+        try {
+            const report = await auditGuild(message.guild, message.author.id, client.user.id, process.env.NEWS_CHANNEL_ID);
+            const lines = [
+                'Проверка каналов и прав. Настройки не изменены.',
+                'Каналов: ' + report.channelCount + '. Канал новостей: ' + (report.targetId || 'не выбран') + '.',
+                'Основная рассылка: ' + (process.env.NEWS_PRODUCTION_ENABLED === 'false' ? 'выключена' : 'включена') + '.',
+                ...report.findings.map(f => '• ' + f)
+            ];
+            if (!report.findings.length) lines.push('В проверенных настройках проблем не обнаружено. Содержание сообщений и доставка новостей здесь не проверялись.');
+            await message.author.send({ content: 'Отчёт по серверу в приложенном файле.',
+                files: [{ attachment: Buffer.from(lines.join('\n'), 'utf8'), name: 'server-audit.txt' }],
+                allowedMentions: { parse: [] } });
+            await message.reply({ content: '✅ Отчёт отправлен тебе в личные сообщения. Настройки не изменены.', allowedMentions: { parse: [] } });
+        } catch (err) {
+            console.error('[server-audit] failed code=' + (err.code || err.name));
+            await message.reply({ content: '❌ Не удалось завершить проверку или отправить отчёт. Проверь личные сообщения и журнал Render.', allowedMentions: { parse: [] } });
+        }
+    }
+});
 
 // --- МОДЕРАЦИЯ ---
 
@@ -1098,7 +1074,7 @@ commands.set('welcome', {
         }
         if (!channel) return message.reply('❌ Укажи канал: !welcome #общее');
 
-        process.env.WELCOME_CHANNEL = channel.name;
+        await setSavedSetting('WELCOME_CHANNEL', channel.id);
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
@@ -1123,7 +1099,9 @@ commands.set('autorole', {
         const role = message.mentions.roles.first();
         if (!role) return message.reply('❌ Укажи роль: !autorole @Member');
 
-        process.env.AUTOROLE = role.id;
+        const forbidden = 2n | 4n | 8n | 16n | 32n | 8192n | 131072n | (1n << 28n) | (1n << 29n) | (1n << 40n);
+        if (role.managed || !role.editable || role.id === message.guild.id || (role.permissions.bitfield & forbidden)) return message.reply('Эту роль нельзя выдавать автоматически: у неё есть права управления или массовых упоминаний.');
+        await setSavedSetting('AUTOROLE', role.id);
 
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
@@ -1136,174 +1114,15 @@ commands.set('autorole', {
 
 // --- СЕРВЕР ---
 
-commands.set('setup', {
-    name: 'setup',
-    description: 'Создать красивую структуру сервера',
-    usage: '!setup',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может настроить сервер!');
-        }
-
-        const guild = message.guild;
-        const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle('⚙️ Создаю структуру сервера...')
-            .setDescription('Подожди несколько секунд...')
-            .setTimestamp();
-        const msg = await message.channel.send({ embeds: [embed] });
-
-        try {
-            // Удаляем существующие каналы (кроме текущего)
-            for (const [, channel] of guild.channels.cache) {
-                if (channel.id !== message.channel.id && channel.type !== 4) {
-                    await channel.delete().catch(() => {});
-                }
-            }
-            for (const [, channel] of guild.channels.cache) {
-                if (channel.id !== message.channel.id && channel.type === 4) {
-                    await channel.delete().catch(() => {});
-                }
-            }
-
-            // Создаём роли
-            const roleAdmin = await guild.roles.create({ name: 'Admin', color: 0xff0000, permissions: [PermissionsBitField.Flags.Administrator] }).catch(() => null);
-            const roleMod = await guild.roles.create({ name: 'Moderator', color: 0xffa500 }).catch(() => null);
-            const roleMember = await guild.roles.create({ name: 'Member', color: 0x00ff00 }).catch(() => null);
-            const roleMuted = await guild.roles.create({ name: 'Muted', color: 0x808080 }).catch(() => null);
-
-            // Создаём категории и каналы
-
-            // 📌 ИНФОРМАЦИЯ
-            const catInfo = await guild.channels.create({ name: '📌 ИНФОРМАЦИЯ', type: 4 });
-            await guild.channels.create({ name: '📜-правила', type: 0, parent: catInfo });
-            await guild.channels.create({ name: '📢-объявления', type: 0, parent: catInfo });
-            await guild.channels.create({ name: '🎫-тикеты', type: 0, parent: catInfo });
-
-            // 💬 ТЕКСТОВЫЕ КАНАЛЫ
-            const catText = await guild.channels.create({ name: '💬 ТЕКСТОВЫЕ КАНАЛЫ', type: 4 });
-            await guild.channels.create({ name: '👋-общение', type: 0, parent: catText });
-            await guild.channels.create({ name: '🎮-игры', type: 0, parent: catText });
-            await guild.channels.create({ name: '🎵-музыка', type: 0, parent: catText });
-            await guild.channels.create({ name: '🖼-мемы', type: 0, parent: catText });
-            await guild.channels.create({ name: '🤖-бот-команды', type: 0, parent: catText });
-
-            // 🔊 ГОЛОСОВЫЕ КАНАЛЫ
-            const catVoice = await guild.channels.create({ name: '🔊 ГОЛОСОВЫЕ КАНАЛЫ', type: 4 });
-            await guild.channels.create({ name: '🔊 Лобби', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '🎮 Игры', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '🎵 Музыка', type: 2, parent: catVoice });
-            await guild.channels.create({ name: '💬 Разговоры', type: 2, parent: catVoice });
-
-            // 🛡 МОДЕРАЦИЯ
-            const catMod = await guild.channels.create({ name: '🛡 МОДЕРАЦИЯ', type: 4 });
-            await guild.channels.create({ name: '📋-логи', type: 0, parent: catMod });
-            await guild.channels.create({ name: '⚡-модерация-чат', type: 0, parent: catMod });
-
-            const successEmbed = new EmbedBuilder()
-                .setColor(0x00ff00)
-                .setTitle('✅ Сервер готов!')
-                .setDescription('Создана красивая структура:')
-                .addFields(
-                    { name: '📌 Информация', value: 'Правила, Объявления, Тикеты', inline: true },
-                    { name: '💬 Текстовые', value: 'Общение, Игры, Музыка, Мемы, Бот', inline: true },
-                    { name: '🔊 Голосовые', value: 'Лобби, Игры, Музыка, Разговоры', inline: true },
-                    { name: '🛡 Модерация', value: 'Логи, Модерация чат', inline: true },
-                    { name: '🎭 Роли', value: 'Admin, Moderator, Member, Muted', inline: true }
-                )
-                .setTimestamp();
-            msg.edit({ embeds: [successEmbed] });
-        } catch (err) {
-            console.error('❌ Ошибка setup:', err);
-            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
-        }
-    }
-});
+commands.set('setup', { name: 'setup', description: 'Устаревшая команда отключена', async execute(message) { return message.reply('Команда отключена: сервер уже настроен. Для изменений используй /настройки или обратись к владельцу.'); } });
 
 // --- ИГРОВЫЕ НОВОСТИ ---
 
-commands.set('gamenews', {
-    name: 'gamenews',
-    description: 'Создать категорию "🎮 ИГРОВЫЕ НОВОСТИ"',
-    usage: '!gamenews',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        const guild = message.guild;
-        const msg = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('🎮 Создаю каналы...').setTimestamp()] });
-
-        try {
-            const category = await guild.channels.create({ name: '🎮 ИГРОВЫЕ НОВОСТИ', type: 4 });
-            await new Promise(r => setTimeout(r, 1000));
-
-            const ch1 = await guild.channels.create({ name: '📰-игровые-новости', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 500));
-            const ch2 = await guild.channels.create({ name: '🎮-lol-новости', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 500));
-            const ch3 = await guild.channels.create({ name: '⚔️-lol-гайды', type: 0, parent: category });
-            await new Promise(r => setTimeout(r, 500));
-            const ch4 = await guild.channels.create({ name: '💬-lol-команды', type: 0, parent: category });
-
-            const everyone = guild.roles.everyone;
-            const owner = await guild.members.fetch(guild.ownerId).catch(() => null);
-            const adminRole = guild.roles.cache.find(r => r.name === 'Admin');
-            const modRole = guild.roles.cache.find(r => r.name === 'Moderator');
-
-            // Каналы автопостинга - никто не пишет кроме.owner и Admin
-            for (const ch of [ch1, ch2, ch3]) {
-                await ch.permissionOverwrites.edit(everyone, { SendMessages: false });
-                if (owner) await ch.permissionOverwrites.edit(owner, { SendMessages: true });
-                if (adminRole) await ch.permissionOverwrites.edit(adminRole, { SendMessages: true });
-            }
-
-            // Канал команд - пишет только.owner, Admin, Moderator
-            await ch4.permissionOverwrites.edit(everyone, { SendMessages: false });
-            if (owner) await ch4.permissionOverwrites.edit(owner, { SendMessages: true });
-            if (adminRole) await ch4.permissionOverwrites.edit(adminRole, { SendMessages: true });
-            if (modRole) await ch4.permissionOverwrites.edit(modRole, { SendMessages: true });
-
-            await new Promise(r => setTimeout(r, 2000));
-
-            // Приветствия
-            await ch1.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('Последние новости из мира игр!\n\nGTA, Cyberpunk, Call of Duty и другие.\nПеревод на русский язык.\nАвто-обновление каждые 4 часа.').setTimestamp()] });
-            await ch2.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Последние новости League of Legends!\n\nПатч-ноуты, новые чемпионы, скины.\nТурнирные новости.\nАвто-обновление.').setTimestamp()] });
-            await ch3.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ И СТАТИСТИКА').setDescription('Tier List, сборки, рейтинги!\n\nДанные: OP.GG | Патч 16.13\nАвто-обновление каждые 6-12 часов.').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
-            await ch3.send({ embeds: [createTierListEmbed()] });
-            await ch4.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь! Бот ответит.\n\n**Доступные команды:**\n`!tierlist` — Tier List\n`!top mid` — Топ чемпионов\n`!builds mid` — Сборки\n`!rating` — Рейтинг\n`!counter Ahri` — Статистика\n`!lolnews` — Новости\n`!lolhelp` — Подробная помощь').setTimestamp()] });
-
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('✅ Каналы созданы!').setDescription('📰-игровые-новости\n🎮-lol-новости\n⚔️-lol-гайды\n💬-lol-команды').setTimestamp()] });
-
-        } catch (err) {
-            console.error('❌ Ошибка gamenews:', err);
-            await msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
-        }
-    }
-});
-
-// --- ОТПРАВИТЬ В TELEGRAM ---
-
-commands.set('tg', {
-    name: 'tg',
-    description: 'Отправить сообщение в Telegram',
-    usage: '!tg [сообщение]',
-    async execute(message, args) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-            return message.reply('❌ Telegram не настроен! Добавь TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в .env');
-        }
-
-        const text = args.join(' ');
-        if (!text) return message.reply('❌ Напиши сообщение: !tg Привет из Discord!');
-
-        await sendToTelegram(text);
-        message.reply('✅ Отправлено в Telegram!');
-    }
-});
+commands.set('gamenews', { name: 'gamenews', description: 'Показать существующий канал новостей', async execute(message) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('❌ Только админ!');
+    await message.guild.channels.fetch(); const channel = selectChannel(message.guild.channels.cache, process.env.NEWS_CHANNEL_ID);
+    return message.reply('Игровые новости: <#' + channel.id + '>. Новые каналы не создавались.');
+} });
 
 // --- ОТПРАВИТЬ ПРИВЕТСТВИЯ ---
 
@@ -1321,30 +1140,30 @@ commands.set('postwelcome', {
 
         // Получаем ВСЕ текстовые каналы
         const channels = guild.channels.cache.filter(ch => ch.type === 0);
-        
+
         let sent = 0;
 
         for (const [, channel] of channels) {
             try {
                 // Проверяем название канала
                 const name = channel.name;
-                
+
                 if (name.includes('игровые') && name.includes('новости')) {
                     await channel.send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle('📰 ИГРОВЫЕ НОВОСТИ').setDescription('GTA, Cyberpunk, Call of Duty и другие игры!\nАвто-обновление каждые 4 часа.').setTimestamp()] });
                     sent++;
                 }
-                
+
                 if (name.includes('lol') && name.includes('новости')) {
                     await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('🎮 LOL НОВОСТИ').setDescription('Патч-ноуты, скины, турниры!\nАвто-обновление.').setTimestamp()] });
                     sent++;
                 }
-                
+
                 if (name.includes('lol') && name.includes('гайды')) {
                     await channel.send({ embeds: [new EmbedBuilder().setColor(0xffd700).setTitle('⚔️ LOL ГАЙДЫ').setDescription('Tier List, сборки, рейтинги!\nПишите команды в 💬-lol-команды').setThumbnail('https://ddragon.leagueoflegends.com/cdn/16.13.1/img/champion/Ahri.png').setTimestamp()] });
                     await channel.send({ embeds: [createTierListEmbed()] });
                     sent++;
                 }
-                
+
                 if (name.includes('lol') && name.includes('команды')) {
                     await channel.send({ embeds: [new EmbedBuilder().setColor(0x00ff00).setTitle('💬 LOL КОМАНДЫ').setDescription('Пишите команды здесь!\n\n!tierlist - Tier List\n!top mid - Топ чемпионов\n!builds mid - Сборки\n!rating - Рейтинг\n!counter Ahri - Статистика\n!lolnews - Новости').setTimestamp()] });
                     sent++;
@@ -1382,11 +1201,11 @@ commands.set('news', {
             const successEmbed = new EmbedBuilder()
                 .setColor(0x00ff00)
                 .setTitle('✅ Новости обновлены!')
-                .setDescription('Новые новости опубликованы в канале **🎮-новости**')
+                .setDescription('Проверка рассылки завершена. Новые подходящие новости отправлены, если они были.')
                 .setTimestamp();
             msg.edit({ embeds: [successEmbed] });
         } catch (err) {
-            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription(err.message)] });
+            msg.edit({ embeds: [new EmbedBuilder().setColor(0xff0000).setTitle('❌ Ошибка').setDescription('Сбой рассылки: проверьте канал, права и журнал Render.')] });
         }
     }
 });
@@ -1590,8 +1409,11 @@ commands.set('verify', {
             verifiedRole = await message.guild.roles.create({
                 name: 'Verified',
                 color: 0x00ff00,
+                permissions: 0n,
             }).catch(() => null);
         }
+
+        if (!verifiedRole || verifiedRole.managed || !verifiedRole.editable || verifiedRole.permissions.bitfield !== 0n) return message.reply('Для безопасной верификации нужна редактируемая роль Verified без дополнительных прав.');
 
         const embed = new EmbedBuilder()
             .setColor(0x5865f2)
@@ -1609,47 +1431,7 @@ commands.set('verify', {
 
 // --- ПРАВИЛА ---
 
-commands.set('rules', {
-    name: 'rules',
-    description: 'Опубликовать правила сервера',
-    usage: '!rules',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может публиковать правила!');
-        }
-
-        const rulesChannel = message.guild.channels.cache.find(ch => ch.name === '📜-правила');
-        if (!rulesChannel) return message.reply('❌ Канал #📜-правила не найден!');
-
-        const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle('📜 ПРАВИЛА СЕРВЕРА')
-            .setDescription('Добро пожаловать на **Сервер ZOHAN**! Пожалуйста, ознакомьтесь с правилами перед использованием сервера.')
-            .addFields(
-                { name: '1️⃣ Уважение', value: 'Уважайте других участников. Запрещены оскорбления, дискриминация, расизм и любые формы харассмента.' },
-                { name: '2️⃣ Спам и реклама', value: 'Запрещён спам, массовые сообщения, реклама других серверов, ботов и товаров без разрешения администратора.' },
-                { name: '3️⃣ Ссылки', value: 'Запрещены сторонние ссылки в чатах. Исключение — ссылки в #🎮-игры с разрешения модератора.' },
-                { name: '4️⃣ Голосовые каналы', value: 'Запрещён крик, микрофон-спам, звуковые эффекты без согласия участников. Уважайте чужое пространство.' },
-                { name: '5️⃣ NSFW контент', value: 'Запрещён порнографический, жестокий и любой 18+ контент. За нарушение — бан.' },
-                { name: '6️⃣ Личные данные', value: 'Запрещено публиковать личные данные других людей (адреса, телефоны, фото) без их согласия.' },
-                { name: '7️⃣ Мультиаккаунты', value: 'Запрещено использование нескольких аккаунтов для обхода бана или мута.' },
-                { name: '8️⃣ Админы', value: 'Следуйте инструкциям модераторов и администраторов. Их решения окончательны.' },
-                { name: '9️⃣ Музыка', value: 'Используйте бота музыки только в голосовых каналах. Не злоупотребляйте командами.' },
-                { name: '🔟 Здравый смысл', value: 'Если действие может навредить серверу или участникам — не делайте его.' }
-            )
-            .setFooter({ text: 'Нарушение правил ведёт к муту, кику или бану. Приятного общения! 🎮' })
-            .setTimestamp();
-
-        await rulesChannel.send({ embeds: [embed] });
-
-        const successEmbed = new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle('✅ Правила опубликованы!')
-            .setDescription(`Правила отправлены в ${rulesChannel}`)
-            .setTimestamp();
-        message.channel.send({ embeds: [successEmbed] });
-    }
-});
+commands.set('rules', { name: 'rules', description: 'Правила сервера', async execute(message) { await message.reply('Правила: https://discord.com/channels/1269021960042446860/1526414882231156878/1526420949828767757'); } });
 
 // --- КОМАНДЫ ДЛЯ ВСЕХ ---
 
@@ -1793,165 +1575,45 @@ commands.set('lockmod', {
 
 // --- УДАЛИТЬ ТИКЕТЫ ---
 
-commands.set('deltickets', {
-    name: 'deltickets',
-    description: 'Удалить канал тикетов',
-    usage: '!deltickets',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ может!');
-        }
-
-        const channel = message.guild.channels.cache.find(ch => ch.name === '🎫-тикеты');
-        if (!channel) return message.reply('❌ Канал тикетов не найден!');
-
-        await channel.delete().catch(() => {});
-        message.reply('✅ Канал тикетов удалён!');
-    }
-});
+commands.set('deltickets', { name: 'deltickets', description: 'Устаревшая команда отключена', async execute(message) { return message.reply('Команда отключена: сервер уже настроен. Для изменений используй /настройки или обратись к владельцу.'); } });
 
 // --- УДАЛИТЬ LOL КОМАНДЫ ---
 
-commands.set('dellolcommands', {
-    name: 'dellolcommands',
-    description: 'Удалить канал lol-команды',
-    usage: '!dellolcommands',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        const channel = message.guild.channels.cache.find(ch => ch.name.includes('lol-komandy') || ch.name.includes('lol-команды'));
-        if (!channel) return message.reply('❌ Канал не найден!');
-
-        await channel.delete().catch(() => {});
-        message.reply('✅ Канал удалён!');
-    }
-});
+commands.set('dellolcommands', { name: 'dellolcommands', description: 'Устаревшая команда отключена', async execute(message) { return message.reply('Команда отключена: сервер уже настроен. Для изменений используй /настройки или обратись к владельцу.'); } });
 
 // --- УДАЛИТЬ LOL КАНАЛЫ (новости + гайды) ---
 
-commands.set('deletelolchannels', {
-    name: 'deletelolchannels',
-    description: 'Удалить каналы lol-новости и lol-гайды',
-    usage: '!deletelolchannels',
-    async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        const deleted = [];
-        const channelNames = ['lol-новости', 'lol-novosti', 'lol-гайды', 'lol-gajdy', '⚔️-lol-гайды', '🎮-lol-новости'];
-
-        for (const name of channelNames) {
-            const ch = message.guild.channels.cache.find(c => c.name.includes(name));
-            if (ch) {
-                await ch.delete().catch(() => {});
-                deleted.push(ch.name);
-            }
-        }
-
-        if (deleted.length === 0) {
-            return message.reply('❌ Каналы lol не найдены!');
-        }
-
-        message.reply(`✅ Удалены каналы: ${deleted.join(', ')}`);
-    }
-});
+commands.set('deletelolchannels', { name: 'deletelolchannels', description: 'Устаревшая команда отключена', async execute(message) { return message.reply('Команда отключена: сервер уже настроен. Для изменений используй /настройки или обратись к владельцу.'); } });
 
 // --- ОЧИСТИТЬ КАНАЛ НОВОСТЕЙ ---
 
 commands.set('clearnews', {
     name: 'clearnews',
-    description: 'Очистить канал от новостей (игровые новости)',
+    description: 'Очистить до 100 старых сообщений этого бота; последние 72 часа сохраняются',
     usage: '!clearnews',
     async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        const newsChannel = message.guild.channels.cache.find(ch =>
-            ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')
-        );
-
-        if (!newsChannel) return message.reply('❌ Канал новостей не найден!');
-
-        try {
-            let deleted = 0;
-            let fetched;
-            do {
-                fetched = await newsChannel.messages.fetch({ limit: 100 });
-                const botMessages = fetched.filter(m => m.author.bot);
-                if (botMessages.size === 0) break;
-                await newsChannel.bulkDelete(botMessages).catch(() => {});
-                deleted += botMessages.size;
-                await new Promise(r => setTimeout(r, 1000));
-            } while (fetched.size >= 100);
-
-            message.reply(`✅ Удалено ${deleted} сообщений бота из канала ${newsChannel}`);
-        } catch (err) {
-            message.reply('❌ Ошибка при очистке: ' + err.message);
-        }
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('❌ Только админ!');
+        await message.guild.channels.fetch();
+        const channel = selectChannel(message.guild.channels.cache, process.env.NEWS_CHANNEL_ID);
+        const recent = await channel.messages.fetch({ limit: 100 });
+        const now = Date.now();
+        const eligible = recent.filter(m => m.author.id === message.client.user.id &&
+            now - m.createdTimestamp > 72 * 60 * 60 * 1000 && now - m.createdTimestamp < 14 * 24 * 60 * 60 * 1000 - 60000);
+        if (!eligible.size) return message.reply('Подходящих старых сообщений среди последних 100 нет. Последние 72 часа сохраняются для защиты от повторов.');
+        const deleted = await channel.bulkDelete(eligible, true);
+        await message.reply('✅ Удалено сообщений этого бота: ' + deleted.size + '. Последние 72 часа сохранены.');
     }
 });
 
-// --- ПЕРЕСОЗДАТЬ КАНАЛ НОВОСТЕЙ ---
-
 commands.set('setupnews', {
     name: 'setupnews',
-    description: 'Удалить и заново создать канал игровых новостей',
+    description: 'Проверить существующий канал новостей без удаления и повторной рассылки',
     usage: '!setupnews',
     async execute(message) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply('❌ Только админ!');
-        }
-
-        // Удаляем старый канал
-        const oldChannel = message.guild.channels.cache.find(ch =>
-            ch.name.includes('igrovye') || ch.name.includes('igrovye-novosti') || ch.name.includes('игровые-новости')
-        );
-        if (oldChannel) {
-            await oldChannel.delete().catch(() => {});
-            await new Promise(r => setTimeout(r, 1000));
-        }
-
-        // Ищем категорию ИГРОВЫЕ НОВОСТИ
-        let category = message.guild.channels.cache.find(ch => ch.name.includes('ИГРОВЫЕ НОВОСТИ') && ch.type === ChannelType.GuildCategory);
-        if (!category) {
-            category = await message.guild.channels.create({
-                name: '🎮 ИГРОВЫЕ НОВОСТИ',
-                type: ChannelType.GuildCategory,
-            }).catch(() => null);
-        }
-
-        // Создаём новый канал
-        const newChannel = await message.guild.channels.create({
-            name: '🎮-игровые-новости',
-            type: ChannelType.GuildText,
-            parent: category?.id || undefined,
-        }).catch(() => null);
-
-        if (!newChannel) return message.reply('❌ Не удалось создать канал!');
-
-        // Делаем канал read-only для @everyone
-        await newChannel.permissionOverwrites.edit(message.guild.roles.everyone, {
-            SendMessages: false,
-            ViewChannel: true,
-        }).catch(() => {});
-
-        // Приветственное сообщение
-        const embed = new EmbedBuilder()
-            .setColor(0x00ff00)
-            .setTitle('🎮 Игровые новости')
-            .setDescription('Сюда бот будет автоматически постить игровые новости на русском языке с картинками.\n\n📰 Новости появляются 3 раза в день: 08:00, 14:00, 20:00')
-            .setTimestamp();
-
-        await newChannel.send({ embeds: [embed] });
-
-        // Триггерим первый пост новостей
-        await postNewsToChannel(message.client);
-
-        message.reply(`✅ Канал ${newChannel} создан! Первая порция новостей отправлена.`);
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('❌ Только админ!');
+        await message.guild.channels.fetch();
+        const channel = selectChannel(message.guild.channels.cache, process.env.NEWS_CHANNEL_ID);
+        await message.reply('✅ Выбран канал <#' + channel.id + '>. Каналы и история сохранены. Для проверки прав используй !serveraudit.');
     }
 });
 
@@ -2114,66 +1776,45 @@ commands.set('poll', {
 
 // ==================== СОБЫТИЯ ====================
 
-client.on('ready', () => {
+client.once('clientReady', async () => {
     console.log(`✅ Бот ${client.user.tag} запущен! Version: ${BOT_VERSION}`);
     client.user.setActivity('!help | Сервер ZOHAN', { type: ActivityType.Playing });
 
-    // Запуск Telegram бота (если настроен)
-    if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-        telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
-        console.log('✅ Telegram бот запущен!');
-
-        // Обработка сообщений из Telegram → Discord
-        telegramBot.on('message', async (msg) => {
-            if (msg.from.is_bot) return;
-
-            // Ищем канал для Telegram сообщений
-            for (const [, guild] of client.guilds.cache) {
-                const tgChannel = guild.channels.cache.find(ch =>
-                    ch.name.includes('telegram') || ch.name.includes('tg')
-                );
-                if (tgChannel) {
-                    const embed = new EmbedBuilder()
-                        .setColor(0x0099ff)
-                        .setTitle('📱 Telegram')
-                        .setDescription(`**${msg.from.first_name || msg.from.username}**: ${msg.text}`)
-                        .setFooter({ text: 'Telegram → Discord' })
-                        .setTimestamp();
-                    await tgChannel.send({ embeds: [embed] }).catch(() => {});
-                }
-            }
-        });
-
-        // Отправляем приветствие
-        sendToTelegram('✅ Бот Discord запущен и связан с сервером!');
+    for (const key of ['WELCOME_CHANNEL', 'AUTOROLE']) if (process.env[key]) savedSettings[key] = process.env[key];
+    await durableState.load();
+    dataReady = durableState.status.ready;
+    if (dataReady) setInterval(() => durableState.flush().catch(() => {}), 30000);
+    const community = createCommunity({ client, state: durableState, news: newsPublisher.status, music: soundcloudSync.status, setSetting: setSavedSetting });
+    client.on('interactionCreate', interaction => community.handle(interaction).catch(error => console.error('[community] interaction failed code=' + error.name)));
+    community.install().then(activities => { communityStatus.ready = true; communityStatus.activities = activities; }).catch(error => { communityStatus.lastError = String(error.code || error.name); console.error('[community] install failed code=' + communityStatus.lastError); });
+    if (soundcloudSync.status.enabled) {
+        soundcloudSync.tick();
+        setInterval(() => soundcloudSync.tick(), 5 * 60 * 1000);
     }
 
     // ==================== РАСПИСАНИЕ ОБНОВЛЕНИЙ ====================
 
-    // Функция проверки времени
-    function isUpdateHour(hours) {
-        const now = new Date().getHours();
-        return hours.includes(now);
-    }
-
-    // Авто-постинг игровых новостей каждые 6 часов (08:00, 14:00, 20:00)
-    const AUTO_NEWS_HOURS = [8, 14, 20];
-    console.log(`📰 Авто-постинг новостей: ${AUTO_NEWS_HOURS.join(':00, ')}:00`);
-
-    setInterval(async () => {
-        const currentHour = new Date().getHours();
-        if (AUTO_NEWS_HOURS.includes(currentHour)) {
-            console.log('📰 Авто-обновление игровых новостей...');
-            await postNewsToChannel(client);
+    // Minute polling, explicit timezone, latest-slot catch-up after wake.
+    try {
+        if (process.env.NEWS_PRODUCTION_ENABLED === 'false') {
+            console.log('[news] production disabled; use owner-only newstest');
+            return;
         }
-    }, 60 * 60 * 1000); // Проверяем каждый час
+        const tickNews = createScheduler({ run: () => postNewsToChannel(client), timeZone: process.env.NEWS_TIMEZONE || 'Europe/Moscow' });
+        console.log('[news] schedule=08:00,14:00,20:00 timezone=' + (process.env.NEWS_TIMEZONE || 'Europe/Moscow'));
+        // No automatic post on startup: first tick is after one minute.
+        setInterval(tickNews, 60 * 1000);
+    } catch {
+        console.error('[news] invalid NEWS_TIMEZONE; internal scheduler disabled');
+    }
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(process.env.PREFIX)) return;
+    if (message.author.bot || !message.guild || !message.member) return;
+    const prefix = process.env.PREFIX || '!';
+    if (!message.content.startsWith(prefix)) return;
 
-    const args = message.content.slice(process.env.PREFIX.length).trim().split(/ +/);
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
 
     const command = commands.get(commandName);
@@ -2182,14 +1823,14 @@ client.on('messageCreate', async (message) => {
     try {
         await command.execute(message, args);
     } catch (error) {
-        console.error(error);
-        message.reply('❌ Произошла ошибка при выполнении команды!');
+        console.error('[command] failed code=' + (error.code || error.name));
+        await message.reply('❌ Произошла ошибка при выполнении команды!').catch(() => {});
     }
 });
 
 // Приветствие новых участников
 client.on('guildMemberAdd', async (member) => {
-    const channel = member.guild.channels.cache.find(ch => ch.name === process.env.WELCOME_CHANNEL);
+    const channel = member.guild.channels.cache.get(process.env.WELCOME_CHANNEL) || member.guild.channels.cache.find(ch => ch.name === process.env.WELCOME_CHANNEL);
     if (channel) {
         const embed = new EmbedBuilder()
             .setColor(0x00ff00)
@@ -2235,7 +1876,7 @@ client.on('guildMemberRemove', async (member) => {
 
 // ЛОГИРОВАНИЕ: удалённые сообщения
 client.on('messageDelete', async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild || !message.member) return;
     const logChannel = message.guild.channels.cache.find(ch => ch.name === '📋-логи');
     if (!logChannel) return;
 
@@ -2304,7 +1945,7 @@ client.on('guildBanRemove', async (ban) => {
 
 // АНТИ-СПАМ и АНТИ-ССЫЛКИ
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild || !message.member) return;
     if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
 
     const userId = message.author.id;
@@ -2348,7 +1989,7 @@ client.on('messageCreate', async (message) => {
     }
 
     // Анти-ссылки (разрешены в каналах: игры, музыка, бот-команды)
-    const allowedChannels = ['🎮-игры', '🎵-музыка', '👋-общение', 'общее'];
+    const allowedChannels = ['🎮-игры', '🎵-музыка', '👋-общение', 'общее', '🤖-бот-команды', '💬-обсуждение'];
     const urlRegex = /https?:\/\/[^\s]+|www\.[^\s]+/i;
     if (urlRegex.test(message.content) && !allowedChannels.includes(message.channel.name)) {
         try {
@@ -2361,21 +2002,20 @@ client.on('messageCreate', async (message) => {
 
 // РЕАКЦИИ: обработка Reaction Roles и Верификация
 client.on('messageReactionAdd', async (reaction, user) => {
-    if (user.bot) return;
-    if (reaction.message.partial) await reaction.message.fetch();
-
-    const guild = reaction.message.guild;
-    const member = guild.members.cache.get(user.id);
-
-    // Верификация
-    if (reaction.emoji.name === '✅') {
-        const verifiedRole = guild.roles.cache.find(r => r.name === 'Verified');
-        if (verifiedRole && !member.roles.cache.has(verifiedRole.id)) {
-            await member.roles.add(verifiedRole).catch(() => {});
-            const ch = guild.channels.cache.find(ch => ch.name === '👋-общение');
-            if (ch) ch.send(`✅ ${member} верифицирован! Добро пожаловать!`).then(m => setTimeout(() => m.delete(), 5000));
-        }
-    }
+    if (user.bot || reaction.emoji.name !== '✅') return;
+    try {
+        if (reaction.message.partial) await reaction.message.fetch();
+        const message = reaction.message;
+        const guild = message.guild;
+        if (!guild || guild.id !== process.env.SERVER_CONTROL_GUILD_ID || message.author?.id !== client.user.id) return;
+        if (!message.embeds?.some(embed => embed.title === '✅ Верификация')) return;
+        const matches = [...guild.roles.cache.values()].filter(role => role.name === 'Verified');
+        if (matches.length !== 1) return;
+        const role = matches[0];
+        if (role.managed || !role.editable || role.permissions.bitfield !== 0n) return;
+        const member = await guild.members.fetch(user.id);
+        if (!member.roles.cache.has(role.id)) await member.roles.add(role);
+    } catch (error) { console.error('[verification] failed code=' + (error.code || error.name)); }
 });
 
 // РОЗЫГРЫШИ: обработка таймеров
@@ -2421,6 +2061,16 @@ setInterval(async () => {
 
 const server = http.createServer(async (req, res) => {
     const url = req.url.split('?')[0];
+    if (url === '/admin/control') {
+        await serverControl.handle(req, res);
+        return;
+    }
+    if (url === '/ready') {
+        const ready = client.isReady();
+        res.writeHead(ready ? 200 : 503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ ready, productionEnabled: process.env.NEWS_PRODUCTION_ENABLED !== 'false', news: newsPublisher.status, soundcloud: soundcloudSync.status, storage: durableState.status, community: communityStatus }));
+        return;
+    }
 
     if (url === '/healthcheck' || url === '/') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -2434,6 +2084,10 @@ const server = http.createServer(async (req, res) => {
     };
 
     if (endpoints[url]) {
+        if (!['GET', 'POST'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, POST' }); res.end(); return; }
+        if (!cronAuthorized(process.env.NEWS_CRON_SECRET, req.headers.authorization)) {
+            res.writeHead(401); res.end('Unauthorized'); return;
+        }
         try {
             await endpoints[url]();
             res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -2441,8 +2095,8 @@ const server = http.createServer(async (req, res) => {
             console.log('📰 Cron triggered: ' + url);
         } catch (err) {
             res.writeHead(500, { 'Content-Type': 'text/plain' });
-            res.end('Error: ' + err.message);
-            console.error('❌ Cron error:', url, err.message);
+            res.end('News delivery failed; inspect Render logs');
+            console.error('❌ Cron error:', url, err.code || err.name);
         }
     } else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -2497,12 +2151,7 @@ function loadScores() {
         }
     } catch (e) {}
 }
-function saveScores() {
-    try {
-        const data = Object.fromEntries(champScores);
-        fs.writeFileSync(SCORES_FILE, JSON.stringify(data, null, 2), 'utf8');
-    } catch (e) {}
-}
+function saveScores() { durableState.changed(); }
 loadScores();
 
 commands.set('champ', {
@@ -2510,6 +2159,7 @@ commands.set('champ', {
     description: 'Мини-игра: Угадай чемпиона по картинке!',
     usage: '!champ',
     async execute(message) {
+        if (!dataReady) return message.reply('Сохранение данных пока недоступно. Проверь /статус.');
         if (activeGames.has(message.channel.id)) {
             return message.reply('⚠️ Уже идёт игра! Дождитесь окончания.');
         }
@@ -2581,7 +2231,7 @@ commands.set('champscores', {
 
 // Обработка ответов в мини-игре
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild || !message.member) return;
     if (!message.content.startsWith(process.env.PREFIX || '!')) return;
 
     const game = activeGames.get(message.channel.id);
@@ -2638,12 +2288,7 @@ function loadXP() {
         }
     } catch (e) {}
 }
-function saveXP() {
-    try {
-        const data = Object.fromEntries(xpData);
-        fs.writeFileSync(XP_FILE, JSON.stringify(data, null, 2), 'utf8');
-    } catch (e) {}
-}
+function saveXP() { durableState.changed(); }
 loadXP();
 
 // XP за сообщение (5-15 рандомно)
@@ -2673,9 +2318,14 @@ function getRankEmoji(level) {
     return '⭐';
 }
 
+const xpCooldown = new Map();
 // Начисление XP за сообщение
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    if (!dataReady || message.author.bot || !message.guild || !message.member || message.guild.id !== process.env.SERVER_CONTROL_GUILD_ID) return;
+    if (message.content.startsWith(process.env.PREFIX || '!')) return;
+    const previous = xpCooldown.get(message.author.id) || 0;
+    if (Date.now() - previous < 60000) return;
+    xpCooldown.set(message.author.id, Date.now());
 
     const userId = message.author.id;
     if (!xpData.has(userId)) xpData.set(userId, { xp: 0, messages: 0, lastLevel: 1 });
@@ -2781,8 +2431,17 @@ commands.set('rank', {
     }
 });
 
-// Сохраняем опубликованные новости при завершении
-process.on('SIGTERM', () => { savePublishedNews(); process.exit(0); });
-process.on('SIGINT', () => { savePublishedNews(); process.exit(0); });
+// Discord message history is the durable news record.
+let shuttingDown = false;
+async function shutdown() {
+    if (shuttingDown) return;
+    shuttingDown = true; dataReady = false;
+    const deadline = setTimeout(() => process.exit(1), 20000);
+    try { if (durableState.status.ready) await durableState.flush(); }
+    catch { console.error('[state] final save failed; inspect last saved snapshot'); }
+    clearTimeout(deadline); client.destroy(); server.close(); process.exit(0);
+}
+process.once('SIGTERM', shutdown);
+process.once('SIGINT', shutdown);
 
 client.login(process.env.TOKEN);
