@@ -1783,7 +1783,7 @@ client.once('clientReady', async () => {
     if (dataReady) setInterval(() => durableState.flush().catch(() => {}), 30000);
     const community = createCommunity({ client, state: durableState, news: newsPublisher.status, music: soundcloudSync.status, setSetting: setSavedSetting });
     client.on('interactionCreate', interaction => community.handle(interaction).catch(error => console.error('[community] interaction failed code=' + error.name)));
-    community.install().then(() => { communityStatus.ready = true; }).catch(error => { communityStatus.lastError = String(error.code || error.name); console.error('[community] install failed code=' + communityStatus.lastError); });
+    community.install().then(activities => { communityStatus.ready = true; communityStatus.activities = activities; }).catch(error => { communityStatus.lastError = String(error.code || error.name); console.error('[community] install failed code=' + communityStatus.lastError); });
     if (soundcloudSync.status.enabled) {
         soundcloudSync.tick();
         setInterval(() => soundcloudSync.tick(), 5 * 60 * 1000);
